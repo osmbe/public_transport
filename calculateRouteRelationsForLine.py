@@ -3,7 +3,6 @@
 import postgresql, re, sys, OSM_lib 
 import argparse
 import urllib.parse
-import urllib.request
 from dblogin import *
 from OSM_data_model import *
 
@@ -75,10 +74,17 @@ nodeIDsofStops = db.prepare("""SELECT DISTINCT
                                   trp.tripstart ASC,
                                   seg.segmentsequence ASC;""")
 
+upsert2Lines = db.prepare("""
+INSERT INTO lines_line ( name, ref, publicref, operator, network, colour, mode, xml )
+                VALUES ( $1, $2, $3, $4, $5, $6, $7, $8::text)
+    ON CONFLICT (ref) DO
+        UPDATE SET name = $1,
+                   xml = $8::text;
+""")
+
 def processPT_line(ml, operator = 'De Lijn', lineref=''):
     distinctroutes = {}
     stops = []
-    routeMaster = PT_RouteMaster(ml)
 
     dlnetworks = ['An', 'OV', 'VB', 'Li', 'WV']
     if operator == 'TEC':
@@ -117,6 +123,7 @@ def processPT_line(ml, operator = 'De Lijn', lineref=''):
                 break
         if notfound: distinctroutes[stops_as_string] = [row['fromstop'],row['tostop'],row['type'],row['bustram'],row['routepublicidentifier']]
 
+    routeMaster = PT_RouteMaster(ml, tags={'public_transport:version': '2', 'odbl': 'tttttt'})
     '''We're only interested in the unique ones'''
     for stopssequence in distinctroutes:
         try:
@@ -141,32 +148,40 @@ def processPT_line(ml, operator = 'De Lijn', lineref=''):
             e = sys.exc_info()[0]
             print( "Error: %s" % e )
 
-        tags={'route': 'bus', 'public_transport:version': '2', 'odbl': 'tttttt'}
-        if int(bustram)==1 and not(operator == 'TEC'):
-            tags['route'] = tram
+        route = PT_Route(ml, tags={'public_transport:version': '2', 'odbl': 'tttttt'})
+        route.addTag('from', fromstop) 
+        route.addTag('to', tostop)
 
-        tags['name'] = operator + ' ' + lineref + ' ' + re.search(removePerronRE,fromstop).group('name') + ''' - ''' + re.search(removePerronRE,tostop).group('name')
-        tags['ref'] = publicid
-        tags['operator'] = operator
-        tags['network'] = network
+        if int(bustram)==1 and not(operator == 'TEC'):
+            route.addTag('route', 'tram')
+            routeMaster.addTag('route_master', 'tram')
+        else:
+            route.addTag('route', 'bus')
+            routeMaster.addTag('route_master', 'bus')
+
+        route.addTag('name', operator + ' ' + publicid + ' ' +
+                     re.search(removePerronRE,fromstop).group('name') + ''' - ''' +
+                     re.search(removePerronRE,tostop).group('name'))
+        route.addTag('ref', publicid)
+        routeMaster.addTag('ref', publicid)
+        route.addTag('operator', operator)
+        routeMaster.addTag('operator', operator)
+        route.addTag('network', network)
+        routeMaster.addTag('network', network)
         if (servicetype and
              int(servicetype) in DL_servicetypes
              and DL_servicetypes[int(servicetype)]
              and not(operator == 'TEC')):
-            tags['bus'] = OSM_servicetypes[int(servicetype)]
-        tags['name'] = OSM_lib.xmlsafe(row['routedescription'])
+            route.addTag('bus', OSM_servicetypes[int(servicetype)])
+            routeMaster.addTag('bus', OSM_servicetypes[int(servicetype)])
         if operator == 'TEC':
-            tags['ref:TEC'] = lineref 
+            route.addTag('ref:TEC', lineref)
+            routeMaster.addTag('ref:TEC',  lineref)
         else:
-            tags['ref:De_Lijn'] = lineref
-        tagsMaster = tags
-        tags['from'] = fromstop 
-        tags['to'] = tostop
+            route.addTag('ref:De_Lijn', lineref)
+            routeMaster.addTag('ref:De_Lijn', lineref)
     
-        route = PT_Route(ml, tags=tags, attributes={})
         routeMaster.addRoute(route)
-        print(routeMaster)
-        input()
         for osmstopID in stopssequence.split(','):
             if osmstopID and osmstopID[0] == '"':
                 osmstopID = stopssequence.split(',')[0].replace('"', '').strip()
@@ -174,10 +189,21 @@ def processPT_line(ml, operator = 'De Lijn', lineref=''):
                 print('                                 ' + osmstopID + ' MISSING!!!!!!!!!!!!!')
             member = RelationMember(role = 'platform', primtype='node', member = osmstopID)
             route.addMember(member)
-        print(route)
-        input()
-        
-    routeMaster.addTags(tagsMaster)
+        routeMaster.addTag('name', operator + ' ' + publicid + ' ' + OSM_lib.xmlsafe(row['routedescription']))
+    xml = ml.asXML()
+    upsert2Lines(routeMaster.tags['name'], routeMaster.tags['ref:De_Lijn'], routeMaster.tags['ref'],
+                 routeMaster.tags['operator'], routeMaster.tags['network'], '', routeMaster.tags['route_master'], xml)
+    return xml
+
+def JOSM_RC(operator = '', lineref = ''):
+    ml = MapLayer()
+    processPT_line(ml, operator = 'De Lijn', lineref=lineref)
+    osmXML = ml.asXML()
+    values = { 'data': osmXML.replace('\n','').replace('\r',''),
+               'new_layer': 'true',
+               'layer_name': lineref} 
+    data = urllib.parse.urlencode(values)
+    return 'http://localhost:8111/load_data?{}'.format(data)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create route relations for each variation of a line')
@@ -188,17 +214,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.route:
-        ml = MapLayer()
-        processPT_line(ml, operator = 'De Lijn', lineref=args.route)
-        osmXML = ml.asXML()
+        url = JOSM_RC(operator = 'De Lijn', lineref=args.route)
         if args.filename:
             with open(args.filename, 'w') as fh:
-               values = { 'data': osmXML.replace('\n','').replace('\r',''),
-                          'new_layer': 'true',
-                          'layer_name': args.route}
-               data = urllib.parse.urlencode(values)
-               url = 'http://localhost:8111/load_data?{}'.format(data)
-
                fh.write('''<html><a href={}>Data for {}<a/></html>'''.format(url, args.route))
         else:
-            print(osmXML)
+            print(url)

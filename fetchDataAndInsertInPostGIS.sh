@@ -1,5 +1,7 @@
 #!/bin/bash
 
+mkdir -p data/DL
+
 echo "Fetch De Lijndata"
 python DL_fetchData.py
 
@@ -23,7 +25,7 @@ psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_r
 echo "Copy CSV data into tables"
 for FN in calendar places routes trips segments stops
 do
-    cat data/$FN.csv | psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -c "COPY DL_$FN FROM STDIN WITH CSV HEADER DELIMITER AS ';';"
+    tail -n +1 data/$FN.csv | psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -c "COPY DL_$FN FROM STDIN WITH HEADER CSV DELIMITER AS ';';"
     read -rsp $'Press any key or wait 5 seconds to continue...\n' -n 1 -t 5;
 done
 
