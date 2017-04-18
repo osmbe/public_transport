@@ -1,0 +1,9 @@
+<h1>{{ line.name }}</h1>
+<ul>
+{% for itinerary in line.itinerary_set.all %}
+    <li> {{ itinerary.ref }} {{ itinerary.fromstop }} - {{ itinerary.tostop }}</li>
+{% endfor %}
+</ul>
+
+<a href={{ line.getLink }} target="_blank">send to JOSM using remote control<a/>
+

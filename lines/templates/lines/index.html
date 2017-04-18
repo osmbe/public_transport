@@ -1,0 +1,9 @@
+{% if lines_list %}
+    <ul>
+    {% for line in lines_list %}
+        <li><a href="/lines/{{ line.ref }}/">{{ line.name }}</a></li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No lines are available.</p>
+{% endif %}
