@@ -1,5 +1,5 @@
 import sys, requests
-fn = 'data/OSM_stops.csv'
+fn = 'data/OSM/stops.csv'
 query=r'''[timeout:300][out:csv(::id, ::lat, ::lon, ::type, ::timestamp, ::version, ::user,"name", "name:De_Lijn",
                                 "name:TEC", "name:nl", "name:fr", "name:en", "name:de", "ref", "ref:De_Lijn",
                                 "ref:TECB", "ref:TECC", "ref:TECH", "ref:TECN", "ref:TECL", "ref:TECX", "route_ref",

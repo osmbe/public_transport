@@ -7,7 +7,6 @@ from .models import Operator
 
 
 class IndexView(generic.ListView):
-    template_name = 'operators/index.html'
 
     def get_queryset(self):
         return Operator.objects.order_by('name')[:50]

@@ -40,7 +40,7 @@ DELETE FROM DL_segments sgt
 print(routescount(), tripscount(), segmentscount())
 print("Converting from Lambert72 and adding route_ref to stops table")
 
-filloutlines = db.proc('FillOutLines()')
+filloutlines = db.proc('DL_FillOutLines()')
 filloutlines()
 
 print("Creating index on description and spatial column containing coordinates from De Lijn")

@@ -41,5 +41,8 @@ psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_c
 echo "Process Data in DB"
 python DL_processDatainDB.py
 
+echo "CREATE VIEWS"
+psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_createViews.sql
+
 echo "CREATE INDEXES"
-psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_createIndexes_2.sql
+psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_createIndexes_1.sql

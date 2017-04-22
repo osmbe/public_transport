@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS OSM_stops;
+DROP TABLE IF EXISTS osm_stops CASCADE;
 CREATE TABLE OSM_stops
  ( id bigint NOT NULL PRIMARY KEY,
     lat float,
@@ -37,4 +37,3 @@ CREATE TABLE OSM_stops
     operator text)
   WITH ( OIDS=FALSE );
 ALTER TABLE OSM_stops OWNER TO polyglot;
-

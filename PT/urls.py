@@ -20,6 +20,8 @@ admin.autodiscover()
 
 urlpatterns=[
     url(r'^lines/', include('lines.urls')),
+    url(r'^operators/', include('operators.urls')),
+    #url(r'^stops/', include('stops.urls')),
     url(r'^admin/', admin.site.urls),
 ]
 

@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION DL_AllLinesPassingAtaStop(stopidentifierparameter int) RETURNS text AS $BODY$
+CREATE OR REPLACE FUNCTION DL_AllLinesPassingAtaStop(stopidentifierparameter text) RETURNS text AS $BODY$
   DECLARE outlines text :='';
     l record;
     line text;
@@ -41,7 +41,7 @@ CREATE OR REPLACE FUNCTION DL_filloutlines() RETURNS void AS $BODY$
   BEGIN
     DROP INDEX IF EXISTS ix_geomDL;
     FOR l IN SELECT stopid, stopidentifier, x, y FROM DL_stops
-      LOOP res := AllLinesPassingAtaStop(l.stopidentifier);
+      LOOP res := DL_AllLinesPassingAtaStop(l.stopidentifier);
         coords := st_transform(st_setSRID(st_Point(l.x, l.y), 31370),4326);
         vlat := st_y(coords);
         vlon := st_x(coords);
