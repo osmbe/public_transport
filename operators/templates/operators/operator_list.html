@@ -1,0 +1,9 @@
+{% if operators_list %}
+    <ul>
+    {% for operator in operators_list %}
+        <li><a href="/operators/{{ operator.name }}/">{{ operator.abbreviation }}</a></li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No operators are available.</p>
+{% endif %}
