@@ -11,7 +11,7 @@ class Line(models.Model):
     mode =  models.CharField('transport mode', max_length=30)
     xml =  models.TextField('XML', default='')
     #pub_date = models.DateTimeField('date published')
-
+    osmrelation = models.IntegerField( blank=True, null=True)
     def __str__(self):
         return '{} {} {} {}'.format(self.mode, self.publicref, self.operator, self.ref)
 
@@ -28,6 +28,8 @@ class Itinerary(models.Model):
     fromstop = models.CharField('first stop', max_length=50)
     tostop = models.CharField('terminus', max_length=50)
     version = models.IntegerField('public transport version of OSM route relation', default=2)
+    osmrelation = models.IntegerField( blank=True, null=True)
+    stopssequence = models.TextField(blank = True)
 
     def __str__(self):
         return '{} {} {}'.format(self.name, self.fromstop, self.tostop)

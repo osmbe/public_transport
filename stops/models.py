@@ -2,18 +2,6 @@ from __future__ import unicode_literals
 
 from django.contrib.gis.db import models
 
-class StopFromOperator(models.Model):
-    operator =  models.ForeignKey(Operator, on_delete=models.CASCADE)
-    geom = models.PointField(help_text="Represented as (longitude, latitude)")
-    offset = models.FloatField(blank=True, null=True)
-    identifier = models.TextField(blank=True, null=True)
-    route_ref = models.TextField(blank=True, null=True)
-    name = models.TextField(blank=True, null=True)
-    street = models.TextField(blank=True, null=True)
-    #stopisaccessible = models.NullBooleanField()
-    
-    objects = models.GeoManager()
-
 class Stop(models.Model):
     '''This model tracks changes. Data from OSM and the various operators comes in through discardable tables. That data is then converted and stored here. If data for this stop was already present in this table, the field gets updated. If this means that something should be changed in OSM, the changed_by_operator flag gets set. I'm not sure at the moment whether it should be more specific: name changed, location changed, abolished
 Changes can happen in OSM as well.
@@ -51,12 +39,9 @@ There should be a possibility to mark certain differences as OK
 ref and route_ref should always be updated in OSM, operator should be authoritative on those
 
 '''
+    osm_id = models.TextField(primary_key=True, help_text="composed of n, w, r + id in OSM")
     changed_in_osm = models.BooleanField()
     changed_by_operator = models.BooleanField()
-    osm_id = models.BigIntegerField(primary_key=True)
-    osm_type = models.TextField(blank=True, null=True)
-    # Geo Django field to store a point
-    geom = models.PointField(help_text="Represented as (longitude, latitude)")
     timestamp = models.DateTimeField(blank=True, null=True)
     version = models.IntegerField(blank=True, null=True)
     username = models.TextField(blank=True, null=True)
@@ -68,7 +53,7 @@ ref and route_ref should always be updated in OSM, operator should be authoritat
     name_en = models.TextField(blank=True, null=True)
     name_de = models.TextField(blank=True, null=True)
     ref = models.TextField(blank=True, null=True)
-    ref_de_lijn = models.ForeignKey(StopFromOperator, to_field="identifier", db_column="name", on_delete=models.CASCADE)
+    ref_de_lijn = models.TextField(blank=True, null=True)
     ref_tecb = models.TextField(blank=True, null=True)
     ref_tecc = models.TextField(blank=True, null=True)
     ref_tech = models.TextField(blank=True, null=True)
@@ -87,11 +72,27 @@ ref and route_ref should always be updated in OSM, operator should be authoritat
     zone_de_lijn = models.TextField(blank=True, null=True)
     zone_tec = models.TextField(blank=True, null=True)
     source = models.TextField(blank=True, null=True)
-    operator = models.TextField(blank=True, null=True)
+    dummy = models.TextField(blank=True, null=True)
+    operator =  models.ForeignKey("operators.Operator", on_delete=models.CASCADE)
 
+    # Geo Django field to store a point
+    #geom = models.PointField(help_text="Represented as (longitude, latitude)")
     # You MUST use GeoManager to make Geo Queries
-    objects = models.GeoManager()
-
+    #objects = models.GeoManager()
+    
     def __str__(self):
         return '{} {} {} {}'.format(self.name, self.operator, self.ref, )
+
+class StopFromOperator(models.Model):
+    osmid = models.ForeignKey(Stop, null=True, blank=True, default = None)
+    operator =  models.ForeignKey("operators.Operator", on_delete=models.CASCADE)
+    offset = models.FloatField(blank=True, null=True)
+    identifier = models.TextField(blank=True, null=True)
+    route_ref = models.TextField(blank=True, null=True)
+    name = models.TextField(blank=True, null=True)
+    street = models.TextField(blank=True, null=True)
+    stopisaccessible = models.NullBooleanField()
+    
+    #geom = models.PointField(help_text="Represented as (longitude, latitude)")
+    #objects = models.GeoManager()
 
