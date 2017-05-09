@@ -25,7 +25,7 @@ psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_r
 echo "Copy CSV data into tables"
 for FN in calendar places routes trips segments stops
 do
-    tail -n +1 data/$FN.csv | psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -c "COPY DL_$FN FROM STDIN WITH HEADER CSV DELIMITER AS ';';"
+    tail -n +1 data/DL/$FN.csv | psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -c "COPY DL_$FN FROM STDIN WITH HEADER CSV DELIMITER AS ';';"
     read -rsp $'Press any key or wait 5 seconds to continue...\n' -n 1 -t 5;
 done
 
@@ -40,9 +40,3 @@ psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_c
 
 echo "Process Data in DB"
 python DL_processDatainDB.py
-
-echo "CREATE VIEWS"
-psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_createViews.sql
-
-echo "CREATE INDEXES"
-psql -h postgresql.ulyssis.org -p 5432 -U polyglot -d polyglot_PT_BEL -a -f DL_createIndexes_1.sql
