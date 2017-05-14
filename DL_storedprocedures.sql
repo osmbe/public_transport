@@ -40,19 +40,20 @@ CREATE OR REPLACE FUNCTION DL_filloutlines() RETURNS void AS $BODY$
 
   BEGIN
     DROP INDEX IF EXISTS ix_geomDL;
-    FOR l IN SELECT stopid, stopidentifier, x, y FROM DL_stops
+    FOR l IN SELECT stopid, stopidentifier, x, y FROM DL_stops ORDER BY stopidentifier
       LOOP res := DL_AllLinesPassingAtaStop(l.stopidentifier);
         coords := st_transform(st_setSRID(st_Point(l.x, l.y), 31370),4326);
         vlat := st_y(coords);
         vlon := st_x(coords);
+	    RAISE NOTICE  'res: %, vlat: %, vlon: %',res, vlat, vlon;
 
-      UPDATE DL_stops AS st
-        SET route_ref=res,
-          geomDL = coords,
-          lat = vlat,
-          lon = vlon
-        WHERE st.stopid=l.stopid;
-	  RAISE NOTICE  '% set to %',l.stopidentifier, res;
+        UPDATE DL_stops AS st
+          SET route_ref=res,
+            geomDL = coords,
+            lat = vlat,
+            lon = vlon
+          WHERE st.stopid=l.stopid;
+	   RAISE NOTICE  '% set to %',l.stopidentifier, res;
      END LOOP;
    END 
 $BODY$ LANGUAGE plpgsql VOLATILE COST 11;

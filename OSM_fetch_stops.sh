@@ -1,6 +1,7 @@
+#!/usr/bin/env bash
 mkdir -p data/OSM
 
-if test `find "data/OSM/stops.csv" -mmin +60`
+if test $(find data/OSM/stops.csv -mmin -120)
 then
     echo 'no need to redownload'
 else

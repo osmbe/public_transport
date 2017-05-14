@@ -1,4 +1,6 @@
-import sys, requests
+from sys import stdout
+from requests import post
+
 fn = 'data/OSM/stops.csv'
 query=r'''[timeout:300][out:csv(::id, ::lat, ::lon, ::type, ::timestamp, ::version, ::user,"name", "name:De_Lijn",
                                 "name:TEC", "name:nl", "name:fr", "name:en", "name:de", "ref", "ref:De_Lijn",
@@ -26,9 +28,9 @@ out meta;'''
 print('Performing Overpass query, please be patient')
 print('============================================')
 print()
-sys.stdout.flush()
+stdout.flush()
 
-response = requests.post("http://overpass-api.de/api/interpreter", query)
+response = post("http://overpass-api.de/api/interpreter", query)
 
 print(response)
 

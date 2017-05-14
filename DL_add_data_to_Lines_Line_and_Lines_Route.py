@@ -1,14 +1,13 @@
 from dblogin import db
-
-import django
-from django.conf import settings
-settings.configure()
-
-django.setup()
-
-#from lines.models import Line
-
 import calculateRouteRelationsForLine
+
+# import django
+# from django.conf import settings
+# settings.configure()
+#
+# django.setup()
+
+# from lines.models import Line
 
 allrouteidentifiersDeLijn = db.prepare("""SELECT 
                                               rte.routeidentifier,

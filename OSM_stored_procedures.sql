@@ -17,4 +17,4 @@ CREATE OR REPLACE FUNCTION osm_stops_offset() RETURNS void AS $BODY$
      END LOOP;
    END
 $BODY$ LANGUAGE plpgsql VOLATILE COST 11;
-GRANT EXECUTE ON FUNCTION DL_filloutlines() TO polyglot;
+GRANT EXECUTE ON FUNCTION osm_stops_offset() TO polyglot;

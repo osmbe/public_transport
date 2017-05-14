@@ -1,6 +1,10 @@
+DROP TABLE IF EXISTS DL_segments;
+DROP TABLE IF EXISTS DL_trips;
+DROP TABLE IF EXISTS DL_routes;
+DROP TABLE IF EXISTS DL_places;
+DROP TABLE IF EXISTS DL_calendar;
 DROP TABLE IF EXISTS DL_stops CASCADE;
 
-DROP TABLE IF EXISTS DL_places;
 CREATE TABLE DL_places (
  placeid int NOT NULL PRIMARY KEY,
  placeidentifier text,
@@ -8,7 +12,6 @@ CREATE TABLE DL_places (
  WITH ( OIDS=FALSE );
 ALTER TABLE DL_places OWNER TO polyglot;
 
-DROP TABLE IF EXISTS DL_calendar;
 CREATE TABLE DL_calendar (
  vscid int NOT NULL PRIMARY KEY,
  vsid bigint,
@@ -17,7 +20,6 @@ CREATE TABLE DL_calendar (
  WITH ( OIDS=FALSE );
 ALTER TABLE DL_calendar OWNER TO polyglot;
 
-DROP TABLE IF EXISTS DL_routes;
 CREATE TABLE DL_routes (
  routeid int NOT NULL PRIMARY KEY,
  routeidentifier text,
@@ -29,7 +31,6 @@ CREATE TABLE DL_routes (
  WITH ( OIDS=FALSE );
 ALTER TABLE DL_routes OWNER TO polyglot;
 
-DROP TABLE IF EXISTS DL_trips;
 CREATE TABLE DL_trips (
  tripid bigint NOT NULL PRIMARY KEY,
  routeid int REFERENCES DL_routes ON DELETE CASCADE,
@@ -48,7 +49,6 @@ CREATE TABLE DL_trips (
  WITH ( OIDS=FALSE );
 ALTER TABLE DL_trips OWNER TO polyglot;
 
-DROP TABLE IF EXISTS DL_segments;
 CREATE TABLE DL_segments (
  segmentid bigint NOT NULL PRIMARY KEY,
  tripid bigint REFERENCES DL_trips ON DELETE CASCADE,
@@ -61,7 +61,6 @@ CREATE TABLE DL_segments (
  WITH ( OIDS=FALSE );
 ALTER TABLE DL_segments OWNER TO polyglot;
 
-DROP TABLE IF EXISTS DL_stops;
 CREATE TABLE DL_stops (
  stopid INT NOT NULL PRIMARY KEY,
  stopidentifier text,

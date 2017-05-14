@@ -3,30 +3,16 @@ from django.db import models
 #!/bin/python
 
 class OSM_Primitive():
-            self.attributes['action'] = 'modify'
-            self.attributes['visible'] = 'true'
-            self.attributes['id'] = str(OSM_Primitive.counter)
-        for attr in ['id', 'lat', 'lon', 'action', 'timestamp', 'uid', 'user', 'visible', 'version', 'changeset']:
-            if attr in self.attributes:
-                self.xml += "{}='{}' ".format(attr, self.attributes[attr])
-        self.xml += '>'
-        if body: self.xml += body
-        for key in self.tags:
-            self.xml += "\n  <tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key])
-        self.xml += '\n</{}>'.format(self.primitive)
-        return self.xml
-    def getParents(self, ml):
-       parents = []
-       for way in ml.ways:
-           if self['id'] in way.getNodes():
-               parents.append(way)
-       for relation in ml.relations:
-           if self['id'] in relation.getMembers():
-               parents.append(relation)
-       return parents
+    osm_id = str(OSM_Primitive.counter)
+    action = 'modify'
+    visible = 'true'
+    timestamp
+    uid
+    user
+    visible
+    version
+    changeset
 
-class Attribute(models.Model):
-    attribute = models.CharField(max_length=100)
 class Tag(models.Model):
     tag = models.CharField(max_length=100)
 class Value(models.Model):

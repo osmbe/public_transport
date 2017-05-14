@@ -4,7 +4,7 @@ import os, sys, re, zipfile, ftplib
 zipre = re.compile('\d\d\d\d-\d\d-\d\d\.zip$')
 
 cwd = os.getcwd()
-wd = cwd + r'/data/DL'
+wd = cwd + '/data/DL/'
 
 """ Fetch the latest zip file from the ftp site of De Lijn """
 
@@ -30,8 +30,9 @@ ftp=ftplib.FTP(host='poseidon.delijn.be', user=username, passwd=password)
 ftp.cwd('current')
 print ("Get name of newest file")
 fn = ftp.nlst()[0]
-localfn = wd + '/' + fn
-print('Saving to ' + fn)
+localfn = wd + fn
+print('Saving to ' + localfn)
+input('press a key')
 size = ftp.size(fn)
 if not(fn in os.listdir(wd)):
     # Only download if a newer file is available
@@ -52,16 +53,19 @@ zipfn=''
 for file in files:
     if re.match(zipre, file):
         if file > zipfn:
-            zipfn = wd + '/' + file
+            zipfn = file
+            print('Extracting ' + zipfn)
 
-zfile = zipfile.ZipFile(zipfn)
-print(); print(); print("Found " + zipfn)
+zfile = zipfile.ZipFile(wd + zipfn)
+print(); print(); print("Found " + wd + zipfn)
+input('press a key')
 for name in zfile.namelist():
     """Recode csv-file with textual content to UTF-8 """
     (dirname, filename) = os.path.split(name)
     print("Decompressing " + filename)
-    fd = open('data/' + name,"wb")
+    fd = open(wd + name,"wb")
     fd.write(zfile.read(name).decode('latin-1').replace('\r','').replace('"','').encode('utf-8'))
     fd.close()
+    print("unzipping " + name)
 
 print ('All files unzipped')
