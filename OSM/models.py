@@ -18,7 +18,7 @@ class Tag(models.Model):
 class Value(models.Model):
     value = models.CharField(max_length=512)
 
-class Node(models.Model):
+class Node(OSM_Primitive):
     def __init__(self, ml, attributes = None, tags = None):
         if not(attributes):
             attributes={'lon': '0.0', 'lat': '0.0'}
@@ -95,7 +95,7 @@ class Relation(OSM_Primitive):
     def asXML(self):
         body = ''
         for member in self.members:
-            body += member.asXML()
+            body += member.asXML
 
         return super().asXML(body=body)
 

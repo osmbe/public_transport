@@ -1,24 +1,24 @@
 import sys, overpy
 import OSM_data_model as osm
 
-operator = network = ''
-
 params = {'timeout': '325'}
-operator="De Lijn"
-network="DLVB"
+operator = "De Lijn"
+network = "DLVB"
 
 if operator: params['operator'] = '["operator"~"' + operator + '"]'
 if network: params['network'] = '["network"~"' + network + '"]'
 query='''[out:xml][timeout:{timeout}];
 (
-  (
-    node
-      ["highway"="bus_stop"]{operator}{network};
+  //(
+    //node
+      //["highway"="bus_stop"]{operator}{network};
+    //way
+      //["amenity"="shelter"]["shelter_type"="public_transport";
     //node
     //  ["railway"="tram_stop"]{operator}{network};
     //node
     //  ["public_transport"="platform"]{operator}{network};
-  );
+  //);
   //._;<;
   relation["route"="bus"]{operator}{network};
 );
@@ -34,7 +34,8 @@ print('Performing Overpass query, please be patient')
 print('============================================')
 sys.stdout.flush()
 
-api = overpy.Overpass(url='https://overpass.kumi.systems/api/interpreter')
+overpass_url = None # https://overpass.kumi.systems/api/interpreter'
+api = overpy.Overpass(url=overpass_url)
 
 result = api.query(query)
 
@@ -47,7 +48,7 @@ for node in result.nodes:
     attributes['id'] = node.id
     attributes['lon'] = node.lon
     attributes['lat'] = node.lat
-    if node.tags.get('highway')=='bus_stop':
+    if node.tags.get('highway') == 'bus_stop':
         stop=osm.PT_Stop(ml, attributes=attributes, tags=node.tags)
         #print(stop.asXML())
     else:
@@ -61,20 +62,19 @@ for way in result.ways:
     w=osm.Way(ml, attributes=attributes, tags=way.tags, nodes=way.nodes)
     #print(w.asXML())
 
+print(len(result.relations))
 for relation in result.relations:
     attributes = relation.attributes
     attributes['id'] = relation.id
     members = []
+
     for rm in relation.members:
-        print(rm.role, rm.ref)
-        print(type(rm))
-        print(rm['timestamp'], dir(rm['timestamp']))
-        print(rm.timestamp, dir(rm.timestamp))
-        members.append(osm.RelationMember(role=rm.role, primtype=type(rm), member=rm.ref))
-        #print(dir(rel))
-    #print(relation.members)
+        members.append(osm.RelationMember(role=rm.role, primtype=rm._type_value, member=str(rm.ref)))
+
     r=osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
+    print(r)
 
 with open('test.osm','w') as fh:
     fh.write(ml.asXML())
 
+print('Data saved to file')

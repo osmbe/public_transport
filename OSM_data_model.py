@@ -34,7 +34,7 @@ class OSM_Primitive():
         else:
             self.tags = {}
         self.primitive = primitive
-        print('attr: ', attributes, self.attributes)
+
         if not (self.attributes) or not ('id' in self.attributes):
             print(OSM_Primitive.counter)
             self.attributes['action'] = 'modify'
@@ -45,10 +45,10 @@ class OSM_Primitive():
     def __repr__(self):
         r = '\n' + self.primitive + '\n'
         for key in self.attributes:
-            r += "{}: {}\n".format(key, self.attributes[key])
+            r += "{}: {},  ".format(key, self.attributes[key])
         for key in self.tags:
             r += "{}: {}\n".format(key, self.tags[key])
-        return
+        return r
 
     def addTags(self, tags):
         if tags:
@@ -63,7 +63,7 @@ class OSM_Primitive():
         for attr in ['id', 'lat', 'lon', 'action', 'timestamp', 'uid', 'user', 'visible', 'version', 'changeset']:
             if attr in self.attributes:
                 if attr == 'timestamp':
-                    self.attributes[attr] = str(self.attributes[attr]).replace(' ','T')+'Z'
+                    self.attributes[attr] = str(self.attributes[attr]).replace(' ', 'T') + 'Z'
                 if attr == 'user':
                     self.attributes[attr] = OL.xmlsafe(self.attributes[attr])
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]))
@@ -136,13 +136,16 @@ class Way(OSM_Primitive):
         body = ''
         for node in self.nodes:
             body += "\n  <nd ref='{node_id}' />".format(node_id=node)
-        return super().asXML()
+        return super().asXML(body=body)
 
 
 class RelationMember():
     def __init__(self, role='', primtype='', member=None):
         self.primtype = primtype
-        self.role = role
+        if role == None:
+            self.role=''
+        else:
+            self.role = role
         try:
             m = member.strip()
         except:
@@ -164,9 +167,16 @@ class Relation(OSM_Primitive):
     def __init__(self, ml, members=None, tags=None, attributes=None):
         super().__init__(ml, primitive='relation', attributes=attributes, tags=tags)
 
-        if not members: self.members = []
-        self.addMembers(members)
+        if not members:
+            self.members = []
+        else:
+            self.members = members
+
         ml.relations[self.attributes['id']] = self
+
+    def __repr__(self):
+        r = super().__repr__()
+        return r
 
     def addMembers(self, members):
         if members:
@@ -181,7 +191,7 @@ class Relation(OSM_Primitive):
         for member in self.members:
             body += member.asXML()
 
-        return super().asXML()
+        return super().asXML(body=body)
 
 
 class PT_Stop(Node):
@@ -205,7 +215,7 @@ class PT_Route(Relation):
 
     def __init__(self, ml, members=None, tags=None, attributes=None):
         tags['type'] = 'route'
-        print('attr PT: ', attributes)
+        print('attr PT route: ', attributes)
         super().__init__(ml, attributes=attributes, tags=tags)
 
 

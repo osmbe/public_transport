@@ -190,7 +190,7 @@ def processPT_line(ml, operator = 'De Lijn', lineref=''):
             member = RelationMember(role = 'platform', primtype='node', member = osmstopID)
             route.addMember(member)
         routeMaster.addTag('name', operator + ' ' + publicid + ' ' + OSM_lib.xmlsafe(row['routedescription']))
-    xml = ml.asXML()
+    xml = ml.asXML
     upsert2Lines(routeMaster.tags['name'], routeMaster.tags['ref:De_Lijn'], routeMaster.tags['ref'],
                  routeMaster.tags['operator'], routeMaster.tags['network'], '', routeMaster.tags['route_master'], xml)
     return xml
