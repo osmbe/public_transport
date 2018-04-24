@@ -7,9 +7,14 @@ class MapLayer():
         self.ways = {}
         self.relations = {}
         self.edges = {}
+        self.changed = [] # list of all 'dirty' objects that need to be flagged for upload
 
     def asXML(self):
-        xml = '''<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' upload='false' generator='Python script'>\n'''
+        params = {upload: " upload='false'",
+                  generator: " generator='Python script'",
+                  }
+        xml = '''<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6'{upload}{generator}>\n'''.format(**params)
+        print (xml)
         for n in self.nodes:
             xml += self.nodes[n].asXML()
         for w in self.ways:
@@ -34,6 +39,8 @@ class OSM_Primitive():
         else:
             self.tags = {}
         self.primitive = primitive
+
+        self.dirty = False
 
         if not (self.attributes) or not ('id' in self.attributes):
             print(OSM_Primitive.counter)
@@ -85,8 +92,6 @@ class OSM_Primitive():
         return parents
 
 
-#    def __repr__(self):
-#        return self.asXML()        
 class Node(OSM_Primitive):
     def __init__(self, ml, attributes=None, tags=None):
         if not (attributes):
@@ -105,6 +110,8 @@ class Way(OSM_Primitive):
         self.nodes = []
         if nodes: self.addNodes(nodes)
         ml.ways[self.attributes['id']] = self
+        self.closed = None
+        self.incomplete = None # not all nodes are downloaded
 
     def __repr__(self):
         body = super().asXML()
@@ -122,6 +129,7 @@ class Way(OSM_Primitive):
         if nodes:
             for n in nodes:
                 self.addNode(n)
+        self.isClosed()
 
     def addNode(self, node):
         try:
@@ -137,6 +145,11 @@ class Way(OSM_Primitive):
         for node in self.nodes:
             body += "\n  <nd ref='{node_id}' />".format(node_id=node)
         return super().asXML(body=body)
+
+    def isClosed(self):
+        self.clsoed = False
+        if self.nodes[0] == self.nodes[-1]
+            self.closed = True
 
 
 class RelationMember():
@@ -173,6 +186,7 @@ class Relation(OSM_Primitive):
             self.members = members
 
         ml.relations[self.attributes['id']] = self
+        self.incomplete = None # not all members are downloaded
 
     def __repr__(self):
         r = super().__repr__()
@@ -217,10 +231,28 @@ class PT_Route(Relation):
         tags['type'] = 'route'
         print('attr PT route: ', attributes)
         super().__init__(ml, attributes=attributes, tags=tags)
+        self.continuous = None
+
+    def isContinuous(self):
+        self.continuous = True
+        lastNodeOfPreviousWay = None
+        for member in self.members:
+            if member.primitive == 'way':
+                ''' Is this way present in the downloaded data?'''
+                if  not(member.memberid in ml.ways):
+                    self.continuous = None
+                    return
+                if lastNodeOfPreviousWay == None:
+                    lastNodeOfPreviousWay = ml.ways[member.memberid][-1]
+                    continue
+                else:
+                    if lastNodeOfPreviousWay != ml.ways[member.memberid][0]:
+                        self.continuous = False
+                        break
 
 
 class PT_RouteMaster(Relation):
-    '''This is what we think of as a publick transport line
+    '''This is what we think of as a public transport line
        It contains route relations for each variation of an itinerary'''
 
     def __init__(self, ml, members=None, tags=None, attributes=None):
