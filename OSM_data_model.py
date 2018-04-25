@@ -234,22 +234,24 @@ class PT_Route(Relation):
         self.continuous = None
 
     def isContinuous(self):
-        self.continuous = True
         lastNodeOfPreviousWay = None
         for member in self.members:
             if member.primitive == 'way':
                 ''' Is this way present in the downloaded data?'''
                 if  not(member.memberid in ml.ways):
                     self.continuous = None
-                    return
+                    return None
+                ''' First time in loop, just store last node of way as previous node'''
                 if lastNodeOfPreviousWay == None:
                     lastNodeOfPreviousWay = ml.ways[member.memberid][-1]
                     continue
                 else:
                     if lastNodeOfPreviousWay != ml.ways[member.memberid][0]:
                         self.continuous = False
-                        break
-
+                        return False
+        '''If we get here, the route is continuous'''
+        self.continuous = True
+        return True
 
 class PT_RouteMaster(Relation):
     '''This is what we think of as a public transport line

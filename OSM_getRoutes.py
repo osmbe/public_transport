@@ -9,17 +9,17 @@ if operator: params['operator'] = '["operator"~"' + operator + '"]'
 if network: params['network'] = '["network"~"' + network + '"]'
 query='''[out:xml][timeout:{timeout}];
 (
-  //(
-    //node
-      //["highway"="bus_stop"]{operator}{network};
+  (
+    node
+      ["highway"="bus_stop"]{operator}{network};
     //way
       //["amenity"="shelter"]["shelter_type"="public_transport";
-    //node
-    //  ["railway"="tram_stop"]{operator}{network};
-    //node
-    //  ["public_transport"="platform"]{operator}{network};
-  //);
-  //._;<;
+    node
+      ["railway"="tram_stop"]{operator}{network};
+    node
+      ["public_transport"="platform"]{operator}{network};
+  );
+  ._;<;
   relation["route"="bus"]{operator}{network};
 );
 (._;>;);
@@ -70,8 +70,18 @@ for relation in result.relations:
 
     for rm in relation.members:
         members.append(osm.RelationMember(role=rm.role, primtype=rm._type_value, member=str(rm.ref)))
-
-    r=osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
+    PT_modes = ['bus', 'trolleybus', 'coach', 'tram', 'metro', 'train']
+    type = relation.tags.get('type')
+    route = relation.tags.get('route')
+    route_master = relation.tags.get('route_master')
+    if type == 'route':
+        if route in PT_modes:
+            r=osm.PT_Route(ml, attributes=attributes, tags=relation.tags, members=members)
+    elif relation.tags.get('type') == 'route_master':
+        if route_master in PT_modes:
+            r = osm.PT_RouteMaster(ml, attributes=attributes, tags=relation.tags, members=members)
+    else:
+        r=osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
     print(r)
 
 with open('test.osm','w') as fh:
