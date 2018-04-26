@@ -148,7 +148,7 @@ class Way(OSM_Primitive):
 
     def isClosed(self):
         self.clsoed = False
-        if self.nodes[0] == self.nodes[-1]
+        if self.nodes[0] == self.nodes[-1]:
             self.closed = True
 
 
