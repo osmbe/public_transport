@@ -200,8 +200,11 @@ class Relation(Primitive):
         self.incomplete = None  # not all members are downloaded
 
     def __repr__(self):
-        r = super().__repr__()
-        return r
+        r = ''
+        for member in self.members:
+            r += member.__repr__()
+
+        return r + super().__repr__()
 
     def add_members(self, members):
         if members:
@@ -209,7 +212,7 @@ class Relation(Primitive):
                 self.add_member(m)
 
     def add_member(self, member):
-        print("adding".format(member))
+        print("adding {}".format(member))
         self.members.append(member)
 
     def as_xml(self, body=''):
@@ -242,7 +245,7 @@ class PublicTransportRoute(Relation):
     def __init__(self, ml, members = None, tags = None, attributes = None):
         self.members = members
         tags['type'] = 'route'
-        print('attr PT route: ', attributes)
+        print('attr PT route: {}'.format(attributes))
         super().__init__(ml, members = members, attributes = attributes, tags = tags)
         self.continuous = None
 
