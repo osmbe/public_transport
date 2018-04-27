@@ -10,18 +10,24 @@ class MapLayer():
         self.edges = {}
         self.changed = []  # list of all 'dirty' objects that need to be flagged for upload
 
-    def as_xml(self):
-        params = {"upload": " upload='false'",
-                  "generator": " generator='Python script'",
-                  }
+    def as_xml(self, upload=False, generator='Python script'):
+        params = {}
+        if upload is False:
+            params["upload"] = " upload='false'"
+        else:
+            params["upload"] = ""
+        if generator:
+            params["generator"] = " generator='{}'".format(generator)
+        else:
+            params["generator"] = ""
         xml = '''<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6'{upload}{generator}>\n'''.format(**params)
-        print(xml)
+
         for n in self.nodes:
-            xml += self.nodes[n].asXML()
+            xml += self.nodes[n].as_xml()
         for w in self.ways:
-            xml += self.ways[w].asXML()
+            xml += self.ways[w].as_xml()
         for r in self.relations:
-            xml += self.relations[r].asXML()
+            xml += self.relations[r].as_xml()
 
         xml += '''\n</osm>'''
         return xml
@@ -133,9 +139,8 @@ class Way(Primitive):
         return self.nodes[position]
 
     def add_nodes(self, nodes):
-        if nodes:
-            for n in nodes:
-                self.add_node(n)
+        for n in nodes:
+            self.add_node(n)
         self.is_closed()
 
     def add_node(self, node):
@@ -204,11 +209,12 @@ class Relation(Primitive):
                 self.add_member(m)
 
     def add_member(self, member):
+        print("adding".format(member))
         self.members.append(member)
 
     def as_xml(self, body=''):
         for member in self.members:
-            body += member.asXML()
+            body += member.as_xml()
 
         return super().as_xml(body=body)
 
@@ -233,11 +239,11 @@ class PublicTransportStopArea(Relation):
 class PublicTransportRoute(Relation):
     """This is what we think of as a variation of a line"""
 
-    def __init__(self, ml, members=None, tags=None, attributes=None):
+    def __init__(self, ml, members = None, tags = None, attributes = None):
         self.members = members
         tags['type'] = 'route'
         print('attr PT route: ', attributes)
-        super().__init__(ml, attributes=attributes, tags=tags)
+        super().__init__(ml, members = members, attributes = attributes, tags = tags)
         self.continuous = None
 
     def is_continuous(self):
@@ -249,7 +255,7 @@ class PublicTransportRoute(Relation):
                     self.continuous = None
                     return None
                 ''' First time in loop, just store last node of way as previous node'''
-                if last_node_of_previous_way == None:
+                if last_node_of_previous_way is None:
                     last_node_of_previous_way = self.maplayer.ways[member.memberid][-1]
                     continue
                 else:
