@@ -2,11 +2,18 @@ import sys, overpy
 import OSM_data_model as osm
 
 params = {'timeout': '325'}
-operator = "De Lijn"
-network = "DLVB"
+operator = "" # ""De Lijn"
+network = "DLLi"
 
-if operator: params['operator'] = '["operator"~"' + operator + '"]'
-if network: params['network'] = '["network"~"' + network + '"]'
+if operator:
+    params['operator'] = '["operator"~"' + operator + '"]'
+else:
+    params['operator'] = ''
+if network:
+    params['network'] = '["network"~"' + network + '"]'
+else:
+    params['network'] = ''
+
 query='''[out:xml][timeout:{timeout}];
 (
   (
@@ -19,7 +26,7 @@ query='''[out:xml][timeout:{timeout}];
     node
       ["public_transport"="platform"]{operator}{network};
   );
-  ._;<;
+  //._;<;
   relation["route"="bus"]{operator}{network};
 );
 (._;>;);
@@ -34,8 +41,8 @@ print('Performing Overpass query, please be patient')
 print('============================================')
 sys.stdout.flush()
 
-overpass_url = None # https://overpass.kumi.systems/api/interpreter'
-api = overpy.Overpass(url=overpass_url)
+#  api = overpy.Overpass(url='https://overpass.kumi.systems/api/interpreter')
+api = overpy.Overpass()
 
 result = api.query(query)
 
@@ -49,7 +56,7 @@ for node in result.nodes:
     attributes['lon'] = node.lon
     attributes['lat'] = node.lat
     if node.tags.get('highway') == 'bus_stop':
-        stop=osm.PT_Stop(ml, attributes=attributes, tags=node.tags)
+        stop=osm.PublicTransportStop(ml, attributes=attributes, tags=node.tags)
         #print(stop.asXML())
     else:
         n=osm.Node(ml, attributes=attributes, tags=node.tags)
@@ -76,15 +83,15 @@ for relation in result.relations:
     route_master = relation.tags.get('route_master')
     if type == 'route':
         if route in PT_modes:
-            r=osm.PT_Route(ml, attributes=attributes, tags=relation.tags, members=members)
+            r=osm.PublicTransportRoute(ml, attributes=attributes, tags=relation.tags, members=members)
     elif relation.tags.get('type') == 'route_master':
         if route_master in PT_modes:
-            r = osm.PT_RouteMaster(ml, attributes=attributes, tags=relation.tags, members=members)
+            r = osm.PublicTransportRouteMaster(ml, attributes=attributes, tags=relation.tags, members=members)
     else:
         r=osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
     print(r)
 
 with open('test.osm','w') as fh:
-    fh.write(ml.asXML())
+    fh.write(ml.as_xml())
 
 print('Data saved to file')
