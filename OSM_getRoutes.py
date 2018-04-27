@@ -1,8 +1,10 @@
-import sys, overpy
+import overpy
+import sys
+
 import OSM_data_model as osm
 
 params = {'timeout': '325'}
-operator = "" # ""De Lijn"
+operator = "De Lijn"
 network = "DLLi"
 
 if operator:
@@ -14,7 +16,7 @@ if network:
 else:
     params['network'] = ''
 
-query='''[out:xml][timeout:{timeout}];
+query = '''[out:xml][timeout:{timeout}];
 (
   (
     node
@@ -56,18 +58,14 @@ for node in result.nodes:
     attributes['lon'] = node.lon
     attributes['lat'] = node.lat
     if node.tags.get('highway') == 'bus_stop':
-        stop=osm.PublicTransportStop(ml, attributes=attributes, tags=node.tags)
-        #print(stop.asXML())
+        stop = osm.PublicTransportStop(ml, attributes=attributes, tags=node.tags)
     else:
-        n=osm.Node(ml, attributes=attributes, tags=node.tags)
-        #print(n.asXML())
+        n = osm.Node(ml, attributes=attributes, tags=node.tags)
 
 for way in result.ways:
     attributes = way.attributes
     attributes['id'] = way.id
-    #print(dir(way))
-    w=osm.Way(ml, attributes=attributes, tags=way.tags, nodes=way.nodes)
-    #print(w.asXML())
+    w = osm.Way(ml, attributes=attributes, tags=way.tags, nodes=way.nodes)
 
 print(len(result.relations))
 for relation in result.relations:
@@ -83,15 +81,14 @@ for relation in result.relations:
     route_master = relation.tags.get('route_master')
     if type == 'route':
         if route in PT_modes:
-            r=osm.PublicTransportRoute(ml, attributes=attributes, tags=relation.tags, members=members)
+            r = osm.PublicTransportRoute(ml, attributes=attributes, tags=relation.tags, members=members)
     elif relation.tags.get('type') == 'route_master':
         if route_master in PT_modes:
             r = osm.PublicTransportRouteMaster(ml, attributes=attributes, tags=relation.tags, members=members)
     else:
-        r=osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
-    print(r)
+        r = osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
 
-with open('test.osm','w') as fh:
+with open('test.osm', 'w') as fh:
     fh.write(ml.as_xml())
 
 print('Data saved to file')
