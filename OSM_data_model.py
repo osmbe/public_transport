@@ -108,10 +108,10 @@ class Primitive:
                     self.attributes[attr] = osmlib.xmlsafe(self.attributes[attr])
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
-        if body:
-            self.xml += body
         for key in self.tags:
             self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(self.tags[key]), **_outputparams)
+        if body:
+            self.xml += body
         self.xml += '{newline}</{primitive}>'.format(**_outputparams)
         return self.xml
 
@@ -180,7 +180,7 @@ class Way(Primitive):
             _outputparams = {'newline': '\n', 'indent':'  '}
         else:
             _outputparams = outputparams
-        print (_outputparams)
+
         for node in self.nodes:
             body += "{newline}{indent}<nd ref='{node_id}' />".format(node_id=node, **_outputparams)
         return super().to_xml(body=body)
@@ -276,7 +276,7 @@ class PublicTransportRoute(Relation):
     def __init__(self, ml, members = None, tags = None, attributes = None):
         self.members = members
         tags['type'] = 'route'
-        print('attr PT route: {}'.format(attributes))
+        #print('attr PT route: {}'.format(attributes))
         super().__init__(ml, members = members, attributes = attributes, tags = tags)
         self.continuous = None
 
