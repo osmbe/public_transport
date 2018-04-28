@@ -85,6 +85,14 @@ class Primitive:
             r += "{}: {}\n".format(key, self.tags[key])
         return r
 
+    @property
+    def id(self):
+        return self.attributes['id']
+
+    @id.setter
+    def id(self, new_id):
+        self.attributes['id'] = new_id
+
     def add_tags(self, tags):
         if tags:
             for key in tags:
