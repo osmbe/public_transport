@@ -90,7 +90,7 @@ class Primitive:
 
     def to_xml(self, outputparams=None, body=''):
         if outputparams is None:
-            _outputparams = {}
+            _outputparams = {'newline': '\n', 'indent':'  '}
         else:
             _outputparams = outputparams
         _outputparams['primitive'] = self.primitive
@@ -170,7 +170,12 @@ class Way(Primitive):
             n = node
         self.nodes.append(str(n))
 
-    def to_xml(self, _outputparams=None, body=''):
+    def to_xml(self, outputparams=None, body=''):
+        if outputparams is None:
+            _outputparams = {'newline': '\n', 'indent':'  '}
+        else:
+            _outputparams = outputparams
+        print (_outputparams)
         for node in self.nodes:
             body += "{newline}{indent}<nd ref='{node_id}' />".format(node_id=node, **_outputparams)
         return super().to_xml(body=body)
@@ -233,11 +238,15 @@ class Relation(Primitive):
         print("adding {}".format(member))
         self.members.append(member)
 
-    def to_xml(self, _outputparams=None, body=''):
+    def to_xml(self, outputparams=None, body=''):
+        if outputparams is None:
+            _outputparams = {'newline': '\n', 'indent':'  '}
+        else:
+            _outputparams = outputparams
         for member in self.members:
             body += member.to_xml(_outputparams)
 
-        return super().to_xml(body=body, _outputparams)
+        return super().to_xml(outputparams=_outputparams, body=body)
 
 
 class PublicTransportStop(Node):
