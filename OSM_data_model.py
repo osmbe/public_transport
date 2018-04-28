@@ -41,6 +41,11 @@ class MapLayer():
         xml += '''{newline}</osm>'''.format(**outputparams)
         return xml
 
+    def to_url(self, upload=False, generator='Python script'):
+        values = {'data': self.to_xml(output='xml', upload = upload, generator = generator)}
+
+        return 'http://localhost:8111/load_data?' + urllib.parse.urlencode(values)
+
 
 class Primitive:
     """Base class with common functionality between Nodes, Ways and Relations"""
