@@ -21,14 +21,14 @@ query = '''[out:xml][timeout:{timeout}];
   (
     node
       ["highway"="bus_stop"]{operator}{network};
-    //way
-      //["amenity"="shelter"]["shelter_type"="public_transport";
     node
       ["railway"="tram_stop"]{operator}{network};
     node
       ["public_transport"="platform"]{operator}{network};
-  );
-  //._;<;
+  )->.stop_nodes;
+  node(around.stop_nodes:30)["amenity"="shelter"];
+  way(around.stop_nodes:30)["amenity"="shelter"];
+
   relation["route"="bus"]{operator}{network};
 );
 (._;>;);
@@ -89,6 +89,6 @@ for relation in result.relations:
         r = osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
 
 with open('test.osm', 'w') as fh:
-    fh.write(ml.as_xml())
+    fh.write(ml.to_xml())
 
 print('Data saved to file')
