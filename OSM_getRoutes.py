@@ -89,6 +89,6 @@ for relation in result.relations:
         r = osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
 
 with open('test.osm', 'w') as fh:
-    fh.write(ml.to_xml())
+    fh.write(ml.to_xml(output='doc'))
 
 print('Data saved to file')

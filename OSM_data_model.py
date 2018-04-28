@@ -1,6 +1,6 @@
 #!/bin/python
 import OSM_lib as osmlib
-
+from urllib.parse import urlencode, quote_plus
 
 class MapLayer():
     def __init__(self):
@@ -44,7 +44,7 @@ class MapLayer():
     def to_url(self, upload=False, generator='Python script'):
         values = {'data': self.to_xml(output='xml', upload = upload, generator = generator)}
 
-        return 'http://localhost:8111/load_data?' + urllib.parse.urlencode(values)
+        return 'http://localhost:8111/load_data?' + urlencode(values, quote_via=quote_plus)
 
 
 class Primitive:
