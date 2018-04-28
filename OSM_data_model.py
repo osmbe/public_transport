@@ -240,7 +240,6 @@ class Relation(Primitive):
                 self.add_member(m)
 
     def add_member(self, member):
-        print("adding {}".format(member))
         self.members.append(member)
 
     def to_xml(self, outputparams=None, body=''):
