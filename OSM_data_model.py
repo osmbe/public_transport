@@ -10,26 +10,35 @@ class MapLayer():
         self.edges = {}
         self.changed = []  # list of all 'dirty' objects that need to be flagged for upload
 
-    def as_xml(self, upload=False, generator='Python script'):
-        params = {}
+    def to_xml(self, output='doc', upload=False, generator='Python script'):
+        """
+        :type output: string doc for formatted file output, url for concise output
+        """
+        outputparams = {}
+        if output == 'url':
+            outputparams['newline'] = ''
+            outputparams['indent'] = ''
+        else:
+            outputparams['newline'] = '\n'
+            outputparams['indent'] = '  '
         if upload is False:
-            params["upload"] = " upload='false'"
+            outputparams["upload"] = " upload='false'"
         else:
-            params["upload"] = ""
+            outputparams["upload"] = ""
         if generator:
-            params["generator"] = " generator='{}'".format(generator)
+            outputparams["generator"] = " generator='{}'".format(generator)
         else:
-            params["generator"] = ""
-        xml = '''<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6'{upload}{generator}>\n'''.format(**params)
+            outputparams["generator"] = ""
+        xml = '''<?xml version='1.0' encoding='UTF-8'?>{newline}<osm version='0.6'{upload}{generator}>{newline}'''.format(**outputparams)
 
         for n in self.nodes:
-            xml += self.nodes[n].as_xml()
+            xml += self.nodes[n].to_xml(outputparams = outputparams)
         for w in self.ways:
-            xml += self.ways[w].as_xml()
+            xml += self.ways[w].to_xml(outputparams = outputparams)
         for r in self.relations:
-            xml += self.relations[r].as_xml()
+            xml += self.relations[r].to_xml(outputparams = outputparams)
 
-        xml += '''\n</osm>'''
+        xml += '''{newline}</osm>'''.format(**outputparams)
         return xml
 
 
@@ -38,7 +47,11 @@ class Primitive:
     counter = -10000
 
     def __init__(self, ml, primitive, attributes=None, tags=None):
+        """
+        :type output: string doc for formatted file output, url for concise output
+        """
         self.maplayer = ml
+
         if attributes:
             self.attributes = attributes
         else:
@@ -75,21 +88,26 @@ class Primitive:
     def add_tag(self, key, value):
         self.tags[key] = value
 
-    def as_xml(self, body=''):
-        self.xml = '\n<{} '.format(self.primitive)
+    def to_xml(self, outputparams=None, body=''):
+        if outputparams is None:
+            _outputparams = {}
+        else:
+            _outputparams = outputparams
+        _outputparams['primitive'] = self.primitive
+        self.xml = '{newline}<{primitive} '.format(**_outputparams)
         for attr in ['id', 'lat', 'lon', 'action', 'timestamp', 'uid', 'user', 'visible', 'version', 'changeset']:
             if attr in self.attributes:
                 if attr == 'timestamp':
                     self.attributes[attr] = str(self.attributes[attr]).replace(' ', 'T') + 'Z'
                 if attr == 'user':
                     self.attributes[attr] = osmlib.xmlsafe(self.attributes[attr])
-                self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]))
+                self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         if body:
             self.xml += body
         for key in self.tags:
-            self.xml += "\n  <tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(self.tags[key]))
-        self.xml += '\n</{}>'.format(self.primitive)
+            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(self.tags[key]), **_outputparams)
+        self.xml += '{newline}</{primitive}>'.format(**_outputparams)
         return self.xml
 
     def get_parents(self):
@@ -152,10 +170,10 @@ class Way(Primitive):
             n = node
         self.nodes.append(str(n))
 
-    def as_xml(self, body=''):
+    def to_xml(self, _outputparams=None, body=''):
         for node in self.nodes:
-            body += "\n  <nd ref='{node_id}' />".format(node_id=node)
-        return super().as_xml(body=body)
+            body += "{newline}{indent}<nd ref='{node_id}' />".format(node_id=node, **_outputparams)
+        return super().to_xml(body=body)
 
     def is_closed(self):
         self.closed = False
@@ -182,9 +200,9 @@ class RelationMember:
                 m = member
         self.memberid = str(m)
 
-    def as_xml(self):
-        return "\n  <member type='{primtype}' ref='{ref}' role='{role}' />".format(
-            primtype=self.primtype, ref=self.memberid, role=self.role)
+    def to_xml(self, outputparams):
+        return "{newline}{indent}<member type='{primtype}' ref='{ref}' role='{role}' />".format(
+            primtype=self.primtype, ref=self.memberid, role=self.role, **outputparams)
 
 
 class Relation(Primitive):
@@ -215,11 +233,11 @@ class Relation(Primitive):
         print("adding {}".format(member))
         self.members.append(member)
 
-    def as_xml(self, body=''):
+    def to_xml(self, _outputparams=None, body=''):
         for member in self.members:
-            body += member.as_xml()
+            body += member.to_xml(_outputparams)
 
-        return super().as_xml(body=body)
+        return super().to_xml(body=body, _outputparams)
 
 
 class PublicTransportStop(Node):
@@ -334,21 +352,21 @@ n7 = Node(ml)
 n8 = Node(ml)
 
 w1 = Way(ml, nodes = [n1, n2])
-print(w1.asXML())
+print(w1.to_xml())
 w2 = Way(ml, nodes = [n2, n3, n4])
 w3 = Way(ml, nodes = [n4, n5])
 w4 = Way(ml, nodes = [n5, n6])
 w5 = Way(ml, nodes = [n6, n7])
 w6 = Way(ml, nodes = [n7, n8])
-print(w6.asXML())
+print(w6.to_xml())
 
 e1 = Edge(ml, parts = [w1, w2])
 e2 = Edge(ml, parts = [w3])
 e3 = Edge(ml, parts = [w4, w5])
 e4 = Edge(ml, parts = [w6])
 
-print(e1.getWays())
-print(e2.getWays())
-print(e3.getWays())
-print(e4.getWays())
+print(e1.get_ways())
+print(e2.get_ways())
+print(e3.get_ways())
+print(e4.get_ways())
 '''
