@@ -41,8 +41,17 @@ class MapLayer():
         xml += '''{newline}</osm>'''.format(**outputparams)
         return xml
 
-    def to_url(self, upload=False, generator='Python script'):
-        values = {'data': self.to_xml(output='xml', upload = upload, generator = generator)}
+    def to_url(self, upload=False, generator='Python script', new_layer=True, layer_name=''):
+        values = {'data': self.to_xml(output='url', upload = upload, generator = generator)}
+        if new_layer is False:
+            values['new_layer'] = 'false'
+        else:
+            values['new_layer'] = 'true'
+
+        if layer_name:
+            values['layer_name'] = layer_name
+        else:
+            values['layer_name'] = ''
 
         return 'http://localhost:8111/load_data?' + urlencode(values, quote_via=quote_plus)
 
@@ -117,12 +126,8 @@ class Primitive:
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         for key in self.tags:
-            #print(type(self.tags[key]))
-            #print(self.tags[key])
             #self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(str(self.tags[key])), **_outputparams)
-            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key,
-                                                                          tag=self.tags[key]),
-                                                                          **_outputparams)
+            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key], **_outputparams)
         if body:
             self.xml += body
         self.xml += '{newline}</{primitive}>'.format(**_outputparams)
