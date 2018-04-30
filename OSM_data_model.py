@@ -117,7 +117,8 @@ class Primitive:
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         for key in self.tags:
-            print(type(self.tags[key]), self.tags[key])
+            print(type(self.tags[key]))
+            print(self.tags[key])
             self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(str(self.tags[key])), **_outputparams)
         if body:
             self.xml += body
