@@ -60,7 +60,7 @@ class MapLayer():
         if layer_name:
             values['layer_name'] = layer_name
 
-        return "http://localhost:8111/load_data?" + urlencode(values)  # , quote_via=quote_plus)
+        return "http://localhost:8111/load_data?" + urlencode(values)
 
     def to_link(self, upload=False, generator='Python script', new_layer=True, layer_name='', linktext=''):
         """
@@ -71,10 +71,10 @@ class MapLayer():
         :type linktext: string text to show on the link
         """
         return '<a href="{url}">{linktext}</a>'.format(**{'url': self.to_url(upload=upload,
-                                                                           generator=generator,
-                                                                           new_layer=new_layer,
-                                                                           layer_name=layer_name),
-                                                        'linktext': linktext})
+                                                                             generator=generator,
+                                                                             new_layer=new_layer,
+                                                                             layer_name=layer_name),
+                                                          'linktext': linktext})
 
 
 class Primitive:
