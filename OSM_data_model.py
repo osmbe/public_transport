@@ -53,6 +53,12 @@ class MapLayer():
 
         return "http://localhost:8111/load_data?" + urlencode(values) #, quote_via=quote_plus)
 
+    def to_link(self, upload=False, generator='Python script', new_layer=True, layer_name='', linktext=''):
+        return '<a href="{}">{}</a>'.format(self.to_url(upload=upload,
+                                                        generator=generator,
+                                                        new_layer=new_layer,
+                                                        layer_name=layer_name),
+                                             linktext)
 
 class Primitive:
     """Base class with common functionality between Nodes, Ways and Relations"""
