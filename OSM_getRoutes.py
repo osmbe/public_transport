@@ -46,7 +46,10 @@ sys.stdout.flush()
 #  api = overpy.Overpass(url='https://overpass.kumi.systems/api/interpreter')
 api = overpy.Overpass()
 
-result = api.query(query)
+try:
+    result = api.query(query)
+except overpy.exception.OverpassBadRequest as e:
+    print(e)
 
 print('Data downloaded')
 
