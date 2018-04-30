@@ -51,7 +51,7 @@ class MapLayer():
         if layer_name:
             values['layer_name'] = layer_name
 
-        return 'http://localhost:8111/load_data?' + urlencode(values, quote_via=quote_plus)
+        return "http://localhost:8111/load_data?" + urlencode(values) #, quote_via=quote_plus)
 
 
 class Primitive:
