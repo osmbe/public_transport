@@ -70,11 +70,12 @@ class MapLayer():
         :type layer_name: string name for the layer to be created if new_layer=True
         :type linktext: string text to show on the link
         """
-        params = {'url': self.to_url(upload=upload,
+        params = {'linktext': linktext,
+                  'url': self.to_url(upload=upload,
                                      generator=generator,
                                      new_layer=new_layer,
-                                     layer_name=layer_name),
-                  'linktext': linktext}
+                                     layer_name=layer_name)
+                  }
         print(params)
         return '<a href="{url}">{linktext}</a>'.format(**params)
 
