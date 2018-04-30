@@ -1,6 +1,7 @@
 #!/bin/python
 import OSM_lib as osmlib
-from urllib.parse import urlencode, quote_plus
+from urllib.parse import urlencode
+
 
 class MapLayer():
     def __init__(self):
@@ -13,6 +14,7 @@ class MapLayer():
     def to_xml(self, output='doc', upload=False, generator='Python script'):
         """
         :type output: string doc for formatted file output, url for concise output
+        :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         """
         outputparams = {}
         if output == 'url':
@@ -29,20 +31,27 @@ class MapLayer():
             outputparams["generator"] = " generator='{}'".format(generator)
         else:
             outputparams["generator"] = ""
-        xml = '''<?xml version='1.0' encoding='UTF-8'?>{newline}<osm version='0.6'{upload}{generator}>{newline}'''.format(**outputparams)
+        xml = '''<?xml version='1.0' encoding='UTF-8'?>{newline}<osm version='0.6'{upload}{generator}>{newline}'''.format(
+            **outputparams)
 
         for n in self.nodes:
-            xml += self.nodes[n].to_xml(outputparams = outputparams)
+            xml += self.nodes[n].to_xml(outputparams=outputparams)
         for w in self.ways:
-            xml += self.ways[w].to_xml(outputparams = outputparams)
+            xml += self.ways[w].to_xml(outputparams=outputparams)
         for r in self.relations:
-            xml += self.relations[r].to_xml(outputparams = outputparams)
+            xml += self.relations[r].to_xml(outputparams=outputparams)
 
         xml += '''{newline}</osm>'''.format(**outputparams)
         return xml
 
     def to_url(self, upload=False, generator='Python script', new_layer=True, layer_name=''):
-        values = {'data': self.to_xml(output='url', upload = upload, generator = generator)}
+        """
+        :type output: string doc for formatted file output, url for concise output
+        :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
+        :type new_layer: bool set to False to add data to currently open layer in JOSM
+        :type layer_name: string name for the layer to be created if new_layer=True
+        """
+        values = {'data': self.to_xml(output='url', upload=upload, generator=generator)}
         if new_layer is False:
             values['new_layer'] = 'false'
         else:
@@ -51,14 +60,22 @@ class MapLayer():
         if layer_name:
             values['layer_name'] = layer_name
 
-        return "http://localhost:8111/load_data?" + urlencode(values) #, quote_via=quote_plus)
+        return "http://localhost:8111/load_data?" + urlencode(values)  # , quote_via=quote_plus)
 
     def to_link(self, upload=False, generator='Python script', new_layer=True, layer_name='', linktext=''):
-        return '<a href="{}">{}</a>'.format(self.to_url(upload=upload,
-                                                        generator=generator,
-                                                        new_layer=new_layer,
-                                                        layer_name=layer_name),
-                                             linktext)
+        """
+        :type output: string doc for formatted file output, url for concise output
+        :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
+        :type new_layer: bool set to False to add data to currently open layer in JOSM
+        :type layer_name: string name for the layer to be created if new_layer=True
+        :type linktext: string text to show on the link
+        """
+        return '<a href="{url}">{linktext}</a>'.format({'url': self.to_url(upload=upload,
+                                                                           generator=generator,
+                                                                           new_layer=new_layer,
+                                                                           layer_name=layer_name),
+                                                        'linktext': linktext})
+
 
 class Primitive:
     """Base class with common functionality between Nodes, Ways and Relations"""
@@ -116,7 +133,7 @@ class Primitive:
 
     def to_xml(self, outputparams=None, body=''):
         if outputparams is None:
-            _outputparams = {'newline': '\n', 'indent':'  '}
+            _outputparams = {'newline': '\n', 'indent': '  '}
         else:
             _outputparams = outputparams
         _outputparams['primitive'] = self.primitive
@@ -130,8 +147,9 @@ class Primitive:
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         for key in self.tags:
-            #self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(str(self.tags[key])), **_outputparams)
-            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key], **_outputparams)
+            # self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(str(self.tags[key])), **_outputparams)
+            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key],
+                                                                              **_outputparams)
         if body:
             self.xml += body
         self.xml += '{newline}</{primitive}>'.format(**_outputparams)
@@ -199,7 +217,7 @@ class Way(Primitive):
 
     def to_xml(self, outputparams=None, body=''):
         if outputparams is None:
-            _outputparams = {'newline': '\n', 'indent':'  '}
+            _outputparams = {'newline': '\n', 'indent': '  '}
         else:
             _outputparams = outputparams
 
@@ -266,7 +284,7 @@ class Relation(Primitive):
 
     def to_xml(self, outputparams=None, body=''):
         if outputparams is None:
-            _outputparams = {'newline': '\n', 'indent':'  '}
+            _outputparams = {'newline': '\n', 'indent': '  '}
         else:
             _outputparams = outputparams
         for member in self.members:
@@ -295,11 +313,10 @@ class PublicTransportStopArea(Relation):
 class PublicTransportRoute(Relation):
     """This is what we think of as a variation of a line"""
 
-    def __init__(self, ml, members = None, tags = None, attributes = None):
+    def __init__(self, ml, members=None, tags=None, attributes=None):
         self.members = members
         tags['type'] = 'route'
-        #print('attr PT route: {}'.format(attributes))
-        super().__init__(ml, members = members, attributes = attributes, tags = tags)
+        super().__init__(ml, members=members, attributes=attributes, tags=tags)
         self.continuous = None
 
     def is_continuous(self):
