@@ -411,7 +411,7 @@ def omitlargercitynames(name,zone):
     return name
 
 def xmlsafe(name):
-    return name.replace('&','&amp;').replace("'","&apos;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
+    return str(name).replace('&','&amp;').replace("'","&apos;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
 
 def urlsafe(name):
     return xmlsafe(name).replace(' ','%20')
