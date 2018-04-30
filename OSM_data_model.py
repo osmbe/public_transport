@@ -119,7 +119,10 @@ class Primitive:
         for key in self.tags:
             print(type(self.tags[key]))
             print(self.tags[key])
-            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(str(self.tags[key])), **_outputparams)
+            #self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(str(self.tags[key])), **_outputparams)
+            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key,
+                                                                          tag=self.tags[key]),
+                                                                          **_outputparams)
         if body:
             self.xml += body
         self.xml += '{newline}</{primitive}>'.format(**_outputparams)
