@@ -104,7 +104,6 @@ class Primitive:
         self.dirty = False
 
         if not self.attributes or not ('id' in self.attributes):
-            print(Primitive.counter)
             self.attributes['action'] = 'modify'
             self.attributes['visible'] = 'true'
             self.attributes['id'] = str(Primitive.counter)

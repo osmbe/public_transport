@@ -91,7 +91,9 @@ for relation in result.relations:
     else:
         r = osm.Relation(ml, attributes=attributes, tags=relation.tags, members=members)
 
-with open('test.osm', 'w') as fh:
-    fh.write(ml.to_xml(output='doc'))
+print (ml.to_url(layer_name='De Lijn 1305'))
+
+#with open('test.osm', 'w') as fh:
+#    fh.write(ml.to_xml(output='doc'))
 
 print('Data saved to file')
