@@ -1,131 +1,111 @@
 from django.db import models
+from django.contrib.gis.db.models import PointField
+from django.contrib.gis.geos import Point
+#from django.contrib.gis.db.models.manager import GeoManager
 
-#!/bin/python
+class Value(models.Model):
+    '''All possible text strings for keys and values of tags'''
+    value = models.TextField()
 
-class OSM_Primitive():
-    osm_id = str(OSM_Primitive.counter)
-    action = 'modify'
-    visible = 'true'
-    timestamp
-    uid
-    user
-    visible
-    version
-    changeset
+    def __str__(self):
+        return self.value
+
 
 class Tag(models.Model):
-    tag = models.CharField(max_length=100)
-class Value(models.Model):
-    value = models.CharField(max_length=512)
+    '''All key/value combinations'''
+    key = models.ForeignKey(Value, related_name='keys')
+    value = models.ForeignKey(Value, related_name='values')
+
+    def __str__(self):
+        return '"{}"= "{}"'.format(self.key, self.value)
+
+    def add_tag(self, key, value):
+        found_key=Value.objects.get(value=key)
+        if found_key:
+            self.key = found_key
+        else:
+            self.key = Value(value=key)
+
+        found_value = Value.objects.get(value=value)
+        if found_value:
+            self.key = found_value
+        else:
+            self.key = Value(value=value)
+
+        self.save()
+        return self
+
+#    def save(self, *args, **kwargs):
+#
+#        __super__.save(*args, **kwargs)
+
+class OSM_Primitive(models.Model):
+    id = models.BigIntegerField(primary_key=True)
+    action = models.CharField(max_length=16)
+    timestamp = models.DateTimeField()
+    uid = models.IntegerField()
+    user = models.TextField()
+    visible = models.BooleanField()
+    version = models.IntegerField()
+    changeset = models.IntegerField()
+    tags = models.ManyToManyField(Tag)
+
+    class Meta:
+        abstract = True
+
+    def add_tag(self, key, value):
+        """It is important to note that a key can only occur once per element.
+           How to enforce that? it's probably OK to "overwrite" its value"""
+        self.tags = Tag.add_tag(key=key, value=value)
+        self.save()
+        return self
+
+    def add_tags(self, tagsdict):
+        for key, value in tagsdict:
+            self.add_tag(key=key, value=value)
+
 
 class Node(OSM_Primitive):
-    def __init__(self, ml, attributes = None, tags = None):
-        if not(attributes):
-            attributes={'lon': '0.0', 'lat': '0.0'}
+    geom = PointField(geography=True, spatial_index=True)
+    #objects = models.GeoManager()
 
-        super().__init__(ml, primitive='node', attributes = attributes, tags=tags)
-        ml.nodes[self.attributes['id']] = self
+    def set_coordinates(self, lon, lat):
+        self.geom = Point(lon, lat)
+        self.save() # should it be saved at this point?
+
+
+class WayNodes(models.Model):
+    sequence = models.PositiveIntegerField()
+
 
 class Way(OSM_Primitive):
-    def __init__(self, ml, attributes = None, nodes = None, tags = None):
-        '''Ways are built up as an ordered sequence of nodes
-           it can happen we only know the id of the node,
-           or we might have a Node object with all the details'''
-        super().__init__(ml, primitive='way', attributes = attributes, tags=tags)
-        self.nodes = []
-        self.addNodes(nodes)
-        ml.ways[self.attributes['id']] = self
+    '''Ways usually have several nodes,
+       nodes can belong to more than 1 way'''
+    nodes = models.ManyToManyField(Node, through='WayNodes')
 
-    def addNodes(self,nodes):
-        if nodes:        
-            for n in nodes:
-                self.addNode(n)
+    def add_node(self, node):
+        # get highest sequence number for this way
+        # add node to WayNodes table with incremented sequence number
+        # what if the node is not in the DB?
+        # should WayNodes have an extra field for the node id, in case the link can't be made?
 
-    def addNode(self,node):
-        try:
-            ''' did we receive an object instance to work with? '''
-            n = node.attributes['id']
-        except KeyError:
-            ''' we received a string '''
-            n = node
-        self.nodes.append(str(n))
+class RelationMember(models.Model):
+    NODE = 'n'
+    WAY = 'w'
+    RELATION = 'r'
+    TYPES = (
+        (NODE, 'node'),
+        (WAY, 'way'),
+        (RELATION, 'relation')
+    )
+    type = models.CharField(max_length=1, choices=TYPES)
+    role = models.TextField()
+    sequence = models.PositiveIntegerField()
+    member_id = models.BigIntegerField()
+    member_node = models.OneToOneField(Node)
+    member_way = models.OneToOneField(Way)
+    member_rel = models.OneToOneField('Relation', related_name='child_relations')
 
-    def asXML(self):
-        body = ''
-        for node in self.nodes:
-            body += "\n  <nd ref='{node_id}' />".format(node_id=node)
-        return super().asXML(body=body)
-
-class RelationMember():
-    def __init__(self, role='', primtype='', member = None):
-        self.primtype = primtype
-        self.role = role
-        try:
-            m = member.strip()
-        except:
-            try:
-                ''' did we receive an object instance to work with? '''
-                m = member.attributes['id']
-                self.primtype = member.primitive
-            except (KeyError, NameError) as e:
-                ''' the member id was passed as a string or an integer '''
-                m = member
-        self.memberid = str(m)
-
-    def asXML(self):
-        return "\n  <member type='{primtype}' ref='{ref}' role='{role}' />".format(
-                                   primtype=self.primtype, ref=self.memberid, role=self.role) 
 
 class Relation(OSM_Primitive):
-    def __init__(self, ml, members = None, tags = None, attributes = None):
-        super().__init__(ml, primitive='relation', attributes = attributes, tags=tags)
-
-        self.members = []
-        self.addMembers(members)
-        ml.relations[self.attributes['id']] = self
-        print (ml.relations)
-    def addMembers(self,members):
-        if members:
-            for m in members:
-                self.addMember(m)
-
-    def addMember(self,member):
-        self.members.append(member)
-
-    def asXML(self):
-        body = ''
-        for member in self.members:
-            body += member.asXML
-
-        return super().asXML(body=body)
-
-class PT_Stop(Node):
-    '''In this model a public transport stop is always mapped on a node with public_transport=platform tag
-       This is a simplification, which makes sure there are always coordinates. In most cases this node
-       represents the pole to which the flag with all details for the stop is mounted'''
-
-    def __init__(self, ml, lon=0.0, lat=0.0, tags = None):
-        super().__init__(ml, lon, lat, tags)
-        self.tags['highway'] = 'bus_stop'
-        self.tags['public_transport'] = 'platform'
-
-class PT_StopArea(Relation):
-    pass
-
-class PT_Route(Relation):
-    '''This is what we think of as a variation of a line'''
-    def __init__(self, ml, members = None, tags = None, attributes = None):
-        tags['type'] = 'route'
-        print('attr PT: ', attributes)
-        super().__init__(ml, attributes = attributes, tags = tags)
-
-class PT_RouteMaster(Relation):
-    '''This is what we think of as a publick transport line
-       It contains route relations for each variation of an itinerary'''
-    def __init__(self, ml, members = None, tags = None, attributes = None):
-        tags['type'] = 'route_master'
-        super().__init__(ml, attributes = attributes, tags = tags)
-
-    def addRoute(self, route):
-        m = RelationMember(primtype = 'relation', role = '', member = route)
-        super().addMember(m)
+    members = models.ForeignKey(RelationMember)
