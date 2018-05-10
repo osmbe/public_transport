@@ -28,9 +28,9 @@ class Tag(models.Model):
 
         found_value = Value.objects.get(value=value)
         if found_value:
-            self.key = found_value
+            self.value = found_value
         else:
-            self.key = Value(value=value)
+            self.value = Value(value=value)
 
         self.save()
         return self
