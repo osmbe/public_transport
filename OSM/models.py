@@ -1,25 +1,26 @@
 from django.contrib.gis.db import models
-# from django.contrib.gis.db.models import PointField
+from django.contrib.gis.db.models import PointField
 from django.contrib.gis.geos import Point
 # from django.contrib.gis.db.models.manager import GeoManager
 
-class Value(models.Model):
+class KeyValueString(models.Model):
     '''All possible text strings for keys and values of tags'''
-    value = models.TextField()
+    content = models.TextField()
 
     def __str__(self):
-        return self.value
+        return self.content
 
 
 class Tag(models.Model):
     '''All key/value combinations'''
-    key = models.ForeignKey(Value, related_name='keys', on_delete=models.CASCADE)
-    value = models.ForeignKey(Value, related_name='values', on_delete=models.CASCADE)
+    key = models.ForeignKey(KeyValueString, related_name='keys', on_delete=models.CASCADE)
+    value = models.ForeignKey(KeyValueString, related_name='values', on_delete=models.CASCADE)
 
     def __str__(self):
         return '"{}"= "{}"'.format(self.key, self.value)
 
     def add_tag(self, key, value):
+<<<<<<< HEAD
         found_key = KeyValueString.objects.filter(value=key)
         count = found_key.count()
         if count > 0:
@@ -39,6 +40,19 @@ class Tag(models.Model):
             newvalue = KeyValueString(value=value)
             newvalue.save()
             self.value = newvalue
+=======
+        found_key=KeyValueString.objects.get(content=key)
+        if found_key:
+            self.key = found_key
+        else:
+            self.key = KeyValueString(content=key)
+
+        found_value = KeyValueString.objects.get(content=value)
+        if found_value:
+            self.value = found_value
+        else:
+            self.value = KeyValueString(content=value)
+>>>>>>> 9aec27fc5b42d6a9cc745bfd1583232718a8f4fe
 
         self.save()
 
@@ -63,25 +77,33 @@ class OSM_Primitive(models.Model):
     class Meta:
         abstract = True
 
-    def add_tag(self, key, value):
+    def add_tag(self, save=True, key, value):
         """It is important to note that a key can only occur once per element.
            How to enforce that? it's probably OK to "overwrite" its value"""
         self.tags = Tag.add_tag(key=key, value=value)
-        self.save()
+        if save:
+            self.save()
         return self
 
     def add_tags(self, tagsdict):
-        for key, value in tagsdict:
-            self.add_tag(key=key, value=value)
+        for k, v in tagsdict:
+            self.add_tag(save = False, key=k, value=v)
+        self.save()
+        return self
 
 
 class Node(OSM_Primitive):
     geom = models.PointField(geography=True, spatial_index=True)
     #objects = models.manager.GeoManager()
 
-    def set_coordinates(self, lon, lat):
+    @property
+    def coordinates(self):
+        return str(self.geom.x), str(self.geom.y)
+
+    @coordinates.setter
+    def coordinates(self, lon, lat):
         self.geom = Point(lon, lat)
-        self.save() # should it be saved at this point?
+        self.save()
 
 
 class WayNodes(models.Model):
