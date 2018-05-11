@@ -30,8 +30,7 @@ class Tag(models.Model):
         if found_value:
             self.value = found_value
         else:
-            self.key = KeyValueString(content=value)
-            self.value = Value(value=value)
+            self.value = KeyValueString(content=value)
 
         self.save()
         return self
