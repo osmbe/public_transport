@@ -20,19 +20,28 @@ class Tag(models.Model):
         return '"{}"= "{}"'.format(self.key, self.value)
 
     def add_tag(self, key, value):
-        found_key=Value.objects.get(value=key)
-        if found_key:
-            self.key = found_key
-        else:
-            self.key = Value(value=key)
+        found_key = KeyValueString.objects.filter(value=key)
+        count = found_key.count()
+        if count > 0:
 
-        found_value = Value.objects.get(value=value)
-        if found_value:
-            self.value = found_value
-        else:
-            self.value = Value(value=value)
+            self.key = found_key[0]
+        elif count == 0:
+            newkey = KeyValueString(value=key)
+            newkey.save()
+            self.key = newkey
+
+
+        found_value = KeyValueString.objects.filter(value=value)
+        value_count = found_value.count()
+        if value_count > 0:
+            self.value = found_value[0]
+        elif value_count == 0 :
+            newvalue = KeyValueString(value=value)
+            newvalue.save()
+            self.value = newvalue
 
         self.save()
+
         return self
 
 #    def save(self, *args, **kwargs):
