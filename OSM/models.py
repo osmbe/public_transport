@@ -20,7 +20,6 @@ class Tag(models.Model):
         return '"{}"= "{}"'.format(self.key, self.value)
 
     def add_tag(self, key, value):
-<<<<<<< HEAD
         found_key = KeyValueString.objects.filter(value=key)
         count = found_key.count()
         if count > 0:
@@ -40,19 +39,6 @@ class Tag(models.Model):
             newvalue = KeyValueString(value=value)
             newvalue.save()
             self.value = newvalue
-=======
-        found_key=KeyValueString.objects.get(content=key)
-        if found_key:
-            self.key = found_key
-        else:
-            self.key = KeyValueString(content=key)
-
-        found_value = KeyValueString.objects.get(content=value)
-        if found_value:
-            self.value = found_value
-        else:
-            self.value = KeyValueString(content=value)
->>>>>>> 9aec27fc5b42d6a9cc745bfd1583232718a8f4fe
 
         self.save()
 
