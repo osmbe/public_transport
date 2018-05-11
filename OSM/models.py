@@ -28,9 +28,10 @@ class Tag(models.Model):
 
         found_value = KeyValueString.objects.get(content=value)
         if found_value:
-            self.key = found_value
+            self.value = found_value
         else:
             self.key = KeyValueString(content=value)
+            self.value = Value(value=value)
 
         self.save()
         return self
