@@ -126,7 +126,7 @@ class Way(OSM_Primitive):
         # for a primitive
         wn=WayNodes(node = node,
                     way = self,
-                    sequence = self.waynodes.set.max()+1)
+                    sequence = self.waynodes_set.count()+1)#or sequence=self.nodes.count()+1
         wn.save()
         return wn
 
