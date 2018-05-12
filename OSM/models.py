@@ -116,6 +116,9 @@ class Way(OSM_Primitive):
        nodes can belong to more than 1 way'''
     nodes = models.ManyToManyField(Node, through='WayNodes', related_name="nodes_in_way")
 
+    def get_nodes(self):
+        return self.waynodes_set.filter(way=self).order_by('waynodes__sequence')
+
     def add_node(self, node):
         # get highest sequence number for this way
         # add node to WayNodes table with incremented sequence number
@@ -126,7 +129,7 @@ class Way(OSM_Primitive):
         # for a primitive
         wn=WayNodes(node = node,
                     way = self,
-                    sequence = self.waynodes.set.max()+1)
+                    sequence = self.waynodes_set.max()+1)
         wn.save()
         return wn
 
