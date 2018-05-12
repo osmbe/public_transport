@@ -5,7 +5,7 @@ from django.contrib.gis.geos import Point
 
 class KeyValueString(models.Model):
     '''All possible text strings for keys and values of tags'''
-    content = models.TextField()
+    content = models.TextField(unique=True)
 
     def __str__(self):
         return self.content
@@ -19,27 +19,30 @@ class Tag(models.Model):
     def __str__(self):
         return '"{}"= "{}"'.format(self.key, self.value)
 
+    class Meta:
+        unique_together = ("key","value")
+
     def add_tag(self, key, value):
 
         #check if the tag with same key and value
         try:
-            found_key = KeyValueString.objects.filter(value=key)
+            found_key = KeyValueString.objects.filter(content=key)
             count = found_key.count()
             if count > 0:
 
                 self.key = found_key[0]
             elif count == 0:
-                newkey = KeyValueString(value=key)
+                newkey = KeyValueString(content=key)
                 newkey.save()
                 self.key = newkey
 
 
-            found_value = KeyValueString.objects.filter(value=value)
+            found_value = KeyValueString.objects.filter(content=value)
             value_count = found_value.count()
             if value_count > 0:
                 self.value = found_value[0]
             elif value_count == 0 :
-                newvalue = KeyValueString(value=value)
+                newvalue = KeyValueString(content=value)
                 newvalue.save()
                 self.value = newvalue
 
@@ -47,9 +50,9 @@ class Tag(models.Model):
 
             return self
         except Exception as e:
-            avail_key = KeyValueString.objects.get(value=key)
+            avail_key = KeyValueString.objects.get(content=key)
             avail_key_id = avail_key.id
-            avail_value = KeyValueString.objects.get(value=value)
+            avail_value = KeyValueString.objects.get(content=value)
             avail_value_id = avail_value.id
 
             tag = Tag.objects.get(key=avail_key_id,value=avail_value_id)
