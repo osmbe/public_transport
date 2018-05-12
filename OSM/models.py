@@ -106,15 +106,15 @@ class Node(OSM_Primitive):
         self.geom = Point(lon, lat)
         self.save()
 
-
 class WayNodes(models.Model):
+    node = models.ForeignKey('Node', on_delete=models.CASCADE)
+    way = models.ForeignKey('Way', on_delete=models.CASCADE)
     sequence = models.PositiveIntegerField()
-
 
 class Way(OSM_Primitive):
     '''Ways usually have several nodes,
        nodes can belong to more than 1 way'''
-    nodes = models.ManyToManyField(Node, through='WayNodes')
+    nodes = models.ManyToManyField(Node, through='WayNodes', related_name="nodes_in_way")
 
     def add_node(self, node):
         # get highest sequence number for this way
