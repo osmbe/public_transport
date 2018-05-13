@@ -127,10 +127,23 @@ class Way(OSM_Primitive):
         # or should there be a 'dummy' in the nodes table so we have something to point to?
         # I created an extra attribute to indicate we don't have all the information
         # for a primitive
-        wn=WayNodes(node = node,
-                    way = self,
-                    sequence = self.waynodes_set.count()+1)#or sequence=self.nodes.count()+1
-        wn.save()
+        count = self.wn_set.count()
+        if count == 0:
+            wn = WN.objects.create(node=node, way=self, sequence=1)
+            wn.save()
+
+        else:
+            node_sequences = self.wn_set.all()
+            sequence_list = []
+            sequence = 0
+
+            for seq in node_sequences:
+                sequence_list.append(seq.sequence)
+
+            max_sequence_num = max(sequence_list)+1
+
+            wn = WN.objects.create(node= node, way=self, sequence=max_sequence_num)
+            wn.save()
         return wn
 
 class RelationMember(models.Model):
