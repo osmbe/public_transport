@@ -127,13 +127,13 @@ class Way(OSM_Primitive):
         # or should there be a 'dummy' in the nodes table so we have something to point to?
         # I created an extra attribute to indicate we don't have all the information
         # for a primitive
-        count = self.wn_set.count()
+        count = self.waynodes_set.count()
         if count == 0:
-            wn = WN.objects.create(node=node, way=self, sequence=1)
+            wn = WayNodes.objects.create(node=node, way=self, sequence=1)
             wn.save()
 
         else:
-            node_sequences = self.wn_set.all()
+            node_sequences = self.waynodes_set.all()
             sequence_list = []
             sequence = 0
 
@@ -142,31 +142,60 @@ class Way(OSM_Primitive):
 
             max_sequence_num = max(sequence_list)+1
 
-            wn = WN.objects.create(node= node, way=self, sequence=max_sequence_num)
+            wn = WayNodes.objects.create(node= node, way=self, sequence=max_sequence_num)
             wn.save()
         return wn
 
 class RelationMember(models.Model):
-    NODE = 'n'
-    WAY = 'w'
-    RELATION = 'r'
-    TYPES = (
-        (NODE, 'node'),
-        (WAY, 'way'),
-        (RELATION, 'relation')
-    )
-    type = models.CharField(max_length=1, choices=TYPES)
+    parent =          models.ForeignKey(Relation,  on_delete=models.CASCADE)
+    member_node =     models.ForeignKey(Node,      on_delete=models.CASCADE)
+    member_way =      models.ForeignKey(Way,       on_delete=models.CASCADE)
+    member_relation = models.ForeignKey(Relation,  on_delete=models.CASCADE)
+
     role = models.TextField()
     sequence = models.PositiveIntegerField()
-    member_node = models.OneToOneField(Node)
-    member_way = models.OneToOneField(Way)
-    member_rel = models.OneToOneField('Relation', related_name='child_relations')
+
+    NODE =     'n'
+    WAY =      'w'
+    RELATION = 'r'
+    TYPES = ((NODE,     'node'),
+             (WAY,      'way'),
+             (RELATION, 'relation'))
+    type = models.CharField(max_length=1, choices=TYPES)
 
 
 class Relation(OSM_Primitive):
-    members = models.ForeignKey(RelationMember, on_delete=models.CASCADE)
+    # The following 3 lines don't seem right. I would prefer to have 1 property called members.
+    member_nodes = models.ManyToManyField(Node, through='WayNodes', related_name="member_nodes")
+    member_ways = models.ManyToManyField(Node, through='WayNodes', related_name="member_ways")
+    member_relations = models.ManyToManyField(Node, through='WayNodes', related_name="member_relations")
 
     def add_member(self, member):
-        return WayNodes(node = node,
-                        way = self,
-                        sequence = self.waynodes.set.max()+1)
+        count = self.relationmember_set.count()
+        rm = None
+        if count == 0:
+            if type(member) == type(Node):
+                rm = RelationMember.objects.create(member_node=member.id, parent=self, sequence=1)
+            elif type(member) == type(Way):
+                rm = RelationMember.objects.create(member_way=member.id, parent=self, sequence=1)
+            elif type(member) == type(Relation):
+                rm = RelationMember.objects.create(member_relation=member.id, parent=self, sequence=1)
+        else:
+            next_in_sequence = max(self.relationmember_set.all()) + 1
+            if type(member) == type(Node):
+                rm = RelationMember.objects.create(member_node= member.id,
+                                                   parent=self,
+                                                   sequence=next_in_sequence)
+            elif type(member) == type(Way):
+                rm = RelationMember.objects.create(member_way= member.id,
+                                                   parent=self,
+                                                   sequence=next_in_sequence)
+            elif type(member) == type(Relation):
+                rm = RelationMember.objects.create(member_relation= member.id,
+                                                   parent=self,
+                                                   sequence=next_in_sequence)
+        if rm:
+            rm.save()
+        return rm
+
+
