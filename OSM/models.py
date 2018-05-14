@@ -147,28 +147,28 @@ class Way(OSM_Primitive):
         return wn
 
 class RelationMember(models.Model):
-    parent =          models.ForeignKey(Relation,  on_delete=models.CASCADE)
-    member_node =     models.ForeignKey(Node,      on_delete=models.CASCADE)
-    member_way =      models.ForeignKey(Way,       on_delete=models.CASCADE)
-    member_relation = models.ForeignKey(Relation,  on_delete=models.CASCADE)
+    parent          = models.ForeignKey('Relation', on_delete=models.CASCADE)
+    member_node     = models.ForeignKey('Node', on_delete=models.CASCADE, blank=True)
+    member_way      = models.ForeignKey('Way', on_delete= models.CASCADE, blank=True)
+    member_relation = models.ForeignKey('Relation', on_delete=models.CASCADE, blank=True, related_name="%(class)s_member_relations")
 
-    role = models.TextField()
-    sequence = models.PositiveIntegerField()
-
-    NODE =     'n'
-    WAY =      'w'
+    NODE = 'n'
+    WAY = 'w'
     RELATION = 'r'
-    TYPES = ((NODE,     'node'),
-             (WAY,      'way'),
-             (RELATION, 'relation'))
+    TYPES = (
+        (NODE, 'node'),
+        (WAY, 'way'),
+        (RELATION, 'relation')
+    )
+
     type = models.CharField(max_length=1, choices=TYPES)
+    role = models.TextField()
+    sequence    = models.PositiveIntegerField()
 
-
-class Relation(OSM_Primitive):
-    # The following 3 lines don't seem right. I would prefer to have 1 property called members.
-    member_nodes = models.ManyToManyField(Node, through='WayNodes', related_name="member_nodes")
-    member_ways = models.ManyToManyField(Node, through='WayNodes', related_name="member_ways")
-    member_relations = models.ManyToManyField(Node, through='WayNodes', related_name="member_relations")
+class Relation(models.Model):
+    member_nodes = models.ManyToManyField('Node', through='RelationMember', through_fields=('parent','member_node'))
+    member_ways  = models.ManyToManyField('Way', through='RelationMember', through_fields=('parent','member_way'))
+    member_relations = models.ManyToManyField('Relation', through='RelationMember', through_fields=('parent','member_relation'))
 
     def add_member(self, member):
         count = self.relationmember_set.count()
