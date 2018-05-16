@@ -170,20 +170,20 @@ class Relation(models.Model):
     member_ways  = models.ManyToManyField('Way', through='RelationMember', through_fields=('parent','member_way'))
     member_relations = models.ManyToManyField('Relation', through='RelationMember', through_fields=('parent','member_relation'))
 
-    def add_member(self, memtype, ref, role):
-        count = self.relationmember_set.count()
+    def add_member(self, member, memtype, role):
+        count = self.memberrelation_set.count()
         rm = None
 
-        if count == 0:
+        if count==0:
             if memtype == 'node':
-                rm = RelationMember(parent=self, member_node=ref, type='n', role=role, sequence=1)
+                rm = MemberRelation(parent=self, member_node=member, type='n', role=role, sequence=1)
             elif memtype == 'way':
-                rm - RelationMember(parent=self, member_way=ref, type='w', role=role, sequence=1)
+                rm - MemberRelation(parent=self, member_way=member, type='w', role=role, sequence=1)
             elif memtype == 'relation':
-                rm = RelationMember(parent=self, member_relation=ref, type='r', role=role, sequence=1)
-        
+                rm = MemberRelation(parent=self, member_relation=member, type='r', role=role, sequence=1)
+
         elif count > 0:
-            mem_sequences = self.relationmember_set.all() 
+            mem_sequences = self.memberrelation_set.all() 
             sequence_list = []
             sequence      = 0
 
@@ -192,15 +192,13 @@ class Relation(models.Model):
 
             max_sequence_num = max(sequence_list) + 1
             if memtype == 'node':
-                rm = RelationMember(parent=self, member_node=ref, type='n', role=role, sequence=max_sequence_num)
+                rm = MemberRelation(parent=self, member_node=member, type='n', role=role, sequence=max_sequence_num)
             elif memtype == 'way':
-                rm - RelationMember(parent=self, member_way=ref, type='w', role=role, sequence=max_sequence_num)
+                rm = MemberRelation(parent=self, member_way=member, type='w', role=role, sequence=max_sequence_num)
             elif memtype == 'relation':
-                rm = RelationMember(parent=self, member_relation=ref, type='r', role=role, sequence=max_sequence_num)
+                rm = MemberRelation(parent=self, member_relation=member, type='r', role=role, sequence=max_sequence_num)
 
-        if rm:
-            rm.save()
+
+        rm.save()
 
         return rm
-
-
