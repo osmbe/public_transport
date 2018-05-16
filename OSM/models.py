@@ -148,9 +148,9 @@ class Way(OSM_Primitive):
 
 class RelationMember(models.Model):
     parent          = models.ForeignKey('Relation', on_delete=models.CASCADE)
-    member_node     = models.ForeignKey('Node', on_delete=models.CASCADE, blank=True)
-    member_way      = models.ForeignKey('Way', on_delete= models.CASCADE, blank=True)
-    member_relation = models.ForeignKey('Relation', on_delete=models.CASCADE, blank=True, related_name="%(class)s_member_relations")
+    member_node     = models.ForeignKey('Node', on_delete=models.CASCADE, blank=True,null=True)
+    member_way      = models.ForeignKey('Way', on_delete= models.CASCADE, blank=True,null=True)
+    member_relation = models.ForeignKey('Relation', on_delete=models.CASCADE, blank=True,null=True, related_name="%(class)s_member_relations")
 
     NODE = 'n'
     WAY = 'w'
@@ -171,19 +171,19 @@ class Relation(models.Model):
     member_relations = models.ManyToManyField('Relation', through='RelationMember', through_fields=('parent','member_relation'))
 
     def add_member(self, member, memtype, role):
-        count = self.memberrelation_set.count()
+        count = self.relationmember_set.count()
         rm = None
 
         if count==0:
             if memtype == 'node':
-                rm = MemberRelation(parent=self, member_node=member, type='n', role=role, sequence=1)
+                rm = RelationMember(parent=self, member_node=member, type='n', role=role, sequence=1)
             elif memtype == 'way':
-                rm - MemberRelation(parent=self, member_way=member, type='w', role=role, sequence=1)
+                rm = RelationMember(parent=self, member_way=member, type='w', role=role, sequence=1)
             elif memtype == 'relation':
-                rm = MemberRelation(parent=self, member_relation=member, type='r', role=role, sequence=1)
+                rm = RelationMember(parent=self, member_relation=member, type='r', role=role, sequence=1)
 
         elif count > 0:
-            mem_sequences = self.memberrelation_set.all() 
+            mem_sequences = self.relationmember_set.all() 
             sequence_list = []
             sequence      = 0
 
@@ -192,13 +192,13 @@ class Relation(models.Model):
 
             max_sequence_num = max(sequence_list) + 1
             if memtype == 'node':
-                rm = MemberRelation(parent=self, member_node=member, type='n', role=role, sequence=max_sequence_num)
+                rm = RelationMember(parent=self, member_node=member, type='n', role=role, sequence=max_sequence_num)
             elif memtype == 'way':
-                rm = MemberRelation(parent=self, member_way=member, type='w', role=role, sequence=max_sequence_num)
+                rm = RelationMember(parent=self, member_way=member, type='w', role=role, sequence=max_sequence_num)
             elif memtype == 'relation':
-                rm = MemberRelation(parent=self, member_relation=member, type='r', role=role, sequence=max_sequence_num)
+                rm = RelationMember(parent=self, member_relation=member, type='r', role=role, sequence=max_sequence_num)
 
-
-        rm.save()
+        if rm:
+            rm.save()
 
         return rm
