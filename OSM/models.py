@@ -78,7 +78,7 @@ class OSM_Primitive(models.Model):
     class Meta:
         abstract = True
 
-    def add_tag(self, save=True, key, value):
+    def add_tag(self, key, value, save=True):
         """It is important to note that a key can only occur once per element.
            How to enforce that? it's probably OK to "overwrite" its value"""
         self.tags = Tag.add_tag(key=key, value=value)
