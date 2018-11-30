@@ -1,9 +1,9 @@
 #!/bin/python
 import OSM_lib as osmlib
 from urllib.parse import urlencode
-from pyproj import Proj, transform
-bel_proj = Proj(init='epsg:31370')
-osm_proj = Proj(init='epsg:4326')
+#from pyproj import Proj, transform
+#bel_proj = Proj(init='epsg:31370')
+#osm_proj = Proj(init='epsg:4326')
 
 class MapLayer():
     def __init__(self):
