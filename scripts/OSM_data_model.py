@@ -16,38 +16,43 @@ class MapLayer():
             if ('highway' in node.tags and node.tags['highway'] == 'bus_stop' or
                 'railway' in node.tags and node.tags['railway'] == 'tram_stop'):
                 PublicTransportStop(ml = self,
-                                        attributes = node.attributes,
-                                        tags = node.tags)
+                                    attributes = node.attributes,
+                                    tags = node.tags)
             else:
                 Node(ml = self,
-                         attributes = node.attributes,
-                         tags = node.tags)
+                     attributes = node.attributes,
+                     tags = node.tags)
 
         for way in osmdata.ways:
             way.attributes['id'] = way.id
             Way(ml = self,
-                    attributes = way.attributes,
-                    tags = way.tags)
+                attributes = way.attributes,
+                tags = way.tags)
 
         for rel in osmdata.relations:
+            members = []
+            for member in rel.members:
+                members.appennd(RelationMember(member = member.ref
+                                               role = member.role
+                                               primtype = _type_value)
             rel.attributes['id'] = rel.id
             if 'type' in rel.tags:
                 if rel.tags['type'] == 'route':
                     PublicTransportRoute(ml = self,
-                                             attributes = rel.attributes,
-                                             tags = rel.tags,
-                                             members = rel.members)
+                                         attributes = rel.attributes,
+                                         tags = rel.tags,
+                                         members = members)
                     continue
                 elif rel.tags['type'] == 'route_master':
                     PublicTransportRouteMaster(ml = self,
-                                                   attributes = rel.attributes,
-                                                   tags = rel.tags,
-                                                   members = rel.members)
+                                               attributes = rel.attributes,
+                                               tags = rel.tags,
+                                               members = members)
                     continue
             Relation(ml = self,
-                         attributes = rel.attributes,
-                         tags = rel.tags,
-                         members = rel.members)
+                     attributes = rel.attributes,
+                     tags = rel.tags,
+                     members = rel.members)
 
     def to_xml(self, output='doc', upload=False, generator='Python script'):
         """
