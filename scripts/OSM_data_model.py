@@ -1,9 +1,6 @@
 #!/bin/python
-import OSM_lib as osmlib
 from urllib.parse import urlencode
-#from pyproj import Proj, transform
-#bel_proj = Proj(init='epsg:31370')
-#osm_proj = Proj(init='epsg:4326')
+from xml.sax.saxutils import escape, quoteattr
 
 class MapLayer():
     def __init__(self):
@@ -11,7 +8,46 @@ class MapLayer():
         self.ways = {}
         self.relations = {}
         self.edges = {}
-        self.changed = []  # list of all 'dirty' objects that need to be flagged for upload
+        self.modified = []  # list of all 'dirty' objects that need to be flagged for upload
+
+    def from_overpy(self, osmdata):
+        for node in osmdata.nodes:
+            node.attributes['id'] = node.id
+            if ('highway' in node.tags and node.tags['highway'] == 'bus_stop' or
+                'railway' in node.tags and node.tags['railway'] == 'tram_stop'):
+                osm.PublicTransportStop(ml = self,
+                                        attributes = node.attributes,
+                                        tags = node.tags)
+            else:
+                osm.Node(ml = self,
+                         attributes = node.attributes,
+                         tags = node.tags)
+
+        for way in osmdata.ways:
+            way.attributes['id'] = way.id
+            osm.Way(ml = self,
+                    attributes = way.attributes,
+                    tags = way.tags)
+
+        for rel in osmdata.relations:
+            rel.attributes['id'] = rel.id
+            if 'type' in rel.tags:
+                if rel.tags['type'] == 'route':
+                    osm.PublicTransportRoute(ml = self,
+                                             attributes = rel.attributes,
+                                             tags = rel.tags,
+                                             members = rel.members)
+                    continue
+                elif rel.tags['type'] == 'route_master':
+                    osm.PublicTransportRouteMaster(ml = self,
+                                                   attributes = rel.attributes,
+                                                   tags = rel.tags,
+                                                   members = rel.members)
+                    continue
+            osm.Relation(ml = self,
+                         attributes = rel.attributes,
+                         tags = rel.tags,
+                         members = rel.members)
 
     def to_xml(self, output='doc', upload=False, generator='Python script'):
         """
@@ -103,10 +139,9 @@ class Primitive:
         self.primitive = primitive
 
         self.xml = ''
-        self.dirty = False
 
         if not ('id' in self.attributes):
-            self.attributes['action'] = 'modify'
+            self.modified = True
             self.attributes['visible'] = 'true'
             self.attributes['id'] = str(Primitive.counter)
             Primitive.counter -= 1
@@ -127,13 +162,25 @@ class Primitive:
     def id(self, new_id):
         self.attributes['id'] = new_id
 
-    def add_tags(self, tags):
+    @property
+    def modified(self):
+        return self.attributes['action'] == 'modify'
+
+    @modified.setter
+    def modified(self, modified_flag):
+        if modified_flag:
+            self.attributes['action'] = 'modify'
+            self.maplayer.modified.append(self)
+
+    def add_tags(self, tags, mark_modified=True):
         if tags:
             for key in tags:
-                self.add_tag(key, tags[key])
+                self.add_tag(key, tags[key], mark_modified=mark_modified)
 
-    def add_tag(self, key, value):
+    def add_tag(self, key, value, mark_modified=True):
         self.tags[key] = value
+        if mark_modified:
+            self.modified = True
 
     def to_xml(self, outputparams=None, body=''):
         if outputparams is None:
@@ -147,11 +194,11 @@ class Primitive:
                 if attr == 'timestamp':
                     self.attributes[attr] = str(self.attributes[attr]).replace(' ', 'T') + 'Z'
                 if attr == 'user':
-                    self.attributes[attr] = osmlib.xmlsafe(self.attributes[attr])
+                    self.attributes[attr] = quoteattr(self.attributes[attr])
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         for key in self.tags:
-            # self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=osmlib.xmlsafe(str(self.tags[key])), **_outputparams)
+            # self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=quoteattr(str(self.tags[key])), **_outputparams)
             self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key],
                                                                               **_outputparams)
         if body:
