@@ -15,17 +15,17 @@ class MapLayer():
             node.attributes['id'] = node.id
             if ('highway' in node.tags and node.tags['highway'] == 'bus_stop' or
                 'railway' in node.tags and node.tags['railway'] == 'tram_stop'):
-                osm.PublicTransportStop(ml = self,
+                PublicTransportStop(ml = self,
                                         attributes = node.attributes,
                                         tags = node.tags)
             else:
-                osm.Node(ml = self,
+                Node(ml = self,
                          attributes = node.attributes,
                          tags = node.tags)
 
         for way in osmdata.ways:
             way.attributes['id'] = way.id
-            osm.Way(ml = self,
+            Way(ml = self,
                     attributes = way.attributes,
                     tags = way.tags)
 
@@ -33,18 +33,18 @@ class MapLayer():
             rel.attributes['id'] = rel.id
             if 'type' in rel.tags:
                 if rel.tags['type'] == 'route':
-                    osm.PublicTransportRoute(ml = self,
+                    PublicTransportRoute(ml = self,
                                              attributes = rel.attributes,
                                              tags = rel.tags,
                                              members = rel.members)
                     continue
                 elif rel.tags['type'] == 'route_master':
-                    osm.PublicTransportRouteMaster(ml = self,
+                    PublicTransportRouteMaster(ml = self,
                                                    attributes = rel.attributes,
                                                    tags = rel.tags,
                                                    members = rel.members)
                     continue
-            osm.Relation(ml = self,
+            Relation(ml = self,
                          attributes = rel.attributes,
                          tags = rel.tags,
                          members = rel.members)
