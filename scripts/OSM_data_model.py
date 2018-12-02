@@ -32,9 +32,9 @@ class MapLayer():
         for rel in osmdata.relations:
             members = []
             for member in rel.members:
-                members.append(RelationMember(member = member.ref,
-                                               role = member.role,
-                                               primtype = member._type_value)
+                members.append(RelationMember(member = str(member.ref),
+                                              role = member.role,
+                                              primtype = member._type_value)
                               )
             rel.attributes['id'] = rel.id
             if 'type' in rel.tags:
