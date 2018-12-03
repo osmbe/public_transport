@@ -10,7 +10,7 @@ class MapLayer():
         self.edges = {}
         self.modified = []  # list of all 'dirty' objects that need to be flagged for upload
 
-    def get_primitive(self, primitive)
+    def get_primitive(self, primitive):
         prim = primitive[0]
         id = primitive[1:]
         if prim == 'n':
