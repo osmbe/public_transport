@@ -15,6 +15,7 @@ class MapLayer():
             node.attributes['id'] = node.id
             if ('highway' in node.tags and node.tags['highway'] == 'bus_stop' or
                 'railway' in node.tags and node.tags['railway'] == 'tram_stop'):
+
                 PublicTransportStop(ml = self,
                                     attributes = node.attributes,
                                     tags = node.tags)
@@ -37,23 +38,22 @@ class MapLayer():
                                               primtype = member._type_value)
                               )
             rel.attributes['id'] = rel.id
+
+            kwargs = {'ml': self,
+                      'attributes': rel.attributes,
+                      'tags': rel.tags,
+                      'members': members}
+
             if 'type' in rel.tags:
-                if rel.tags['type'] == 'route':
-                    PublicTransportRoute(ml = self,
-                                         attributes = rel.attributes,
-                                         tags = rel.tags,
-                                         members = members)
+                if rel.tags['type'] ==   'route':
+                    rt =   PublicTransportRoute(**kwargs)
                     continue
+
                 elif rel.tags['type'] == 'route_master':
-                    PublicTransportRouteMaster(ml = self,
-                                               attributes = rel.attributes,
-                                               tags = rel.tags,
-                                               members = members)
+                    rm =   PublicTransportRouteMaster(**kwargs)
                     continue
-            Relation(ml = self,
-                     attributes = rel.attributes,
-                     tags = rel.tags,
-                     members = rel.members)
+
+            Relation(**kwargs)
 
     def to_xml(self, output='doc', upload=False, generator='Python script'):
         """
@@ -368,12 +368,16 @@ class PublicTransportStopArea(Relation):
 
 
 class PublicTransportRoute(Relation):
-    """This is what we think of as a variation of a line"""
+    """This is what we think of as a variation of a line,
+       an ordered sequence of stops along an itinerary."""
 
     def __init__(self, ml, members=None, tags=None, attributes=None):
-        self.members = members
-        tags['type'] = 'route'
-        super().__init__(ml, members=members, attributes=attributes, tags=tags)
+        if tags is None:
+            self.tags = []
+        else:
+            self.tags = tags
+        self.tags['type'] = 'route'
+        super().__init__(ml, members=members, attributes=attributes, tags=self.tags)
         self.continuous = None
 
     def is_continuous(self):
@@ -392,26 +396,24 @@ class PublicTransportRoute(Relation):
                     if last_node_of_previous_way != self.maplayer.ways[member.memberid][0]:
                         self.continuous = False
                         return False
-        '''If we get here, the route is continuous'''
-        self.continuous = True
-        return True
-
+        if last_node_of_previous_way:
+            '''If we get here, the route is continuous'''
+            self.continuous = True
+        else:
+            self.continuous = None
+        return self.continuous
 
 class PublicTransportRouteMaster(Relation):
     """This is what we think of as a public transport line
        It contains route relations for each variation of an itinerary"""
 
     def __init__(self, ml, members=None, tags=None, attributes=None):
-        if members is None:
-            self.members = []
-        else:
-            self.members = members
         if tags is None:
             self.tags = []
         else:
             self.tags = tags
         self.tags['type'] = 'route_master'
-        super().__init__(ml, attributes=attributes, tags=self.tags)
+        super().__init__(ml, members=members, attributes=attributes, tags=self.tags)
 
     def add_route(self, route):
         super().add_member(RelationMember(primtype='relation', role='', member=route))
