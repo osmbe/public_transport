@@ -10,6 +10,28 @@ class MapLayer():
         self.edges = {}
         self.modified = []  # list of all 'dirty' objects that need to be flagged for upload
 
+    def get_primitive(self, primitive)
+        prim = primitive[0]
+        id = primitive[1:]
+        if prim == 'n':
+            if id in self.nodes:
+                return self.nodes[id]
+            else:
+                raise ValueError('id ' + id + ' not found in nodes')
+        elif prim == 'w':
+            if id in self.nodes:
+                return self.ways[id]
+            else:
+                raise ValueError('id ' + id + ' not found in ways')
+        elif prim == 'r':
+            if id in self.nodes:
+                return self.relations[id]
+            else:
+                raise ValueError('id ' + id + ' not found in relations')
+        else:
+            raise ValueError('id should start with n, w or r')
+
+
     def from_overpy(self, osmdata):
         for node in osmdata.nodes:
             node.attributes['id'] = node.id
