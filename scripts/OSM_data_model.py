@@ -220,7 +220,7 @@ class Primitive:
         for attr in ['id', 'lat', 'lon', 'action', 'timestamp', 'uid', 'user', 'visible', 'version', 'changeset']:
             if attr in self.attributes:
                 if attr == 'timestamp':
-                    self.attributes[attr] = str(self.attributes[attr]).replace(' ', 'T') + 'Z'
+                    self.attributes[attr] = str(self.attributes[attr]).replace(' ', 'T').replace('Z', '') + 'Z'
                 if attr == 'user':
                     self.attributes[attr] = self.attributes[attr]
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
