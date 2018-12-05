@@ -38,8 +38,11 @@ class MapLayer():
             if ('highway' in node.tags and node.tags['highway'] == 'bus_stop' or
                 'railway' in node.tags and node.tags['railway'] == 'tram_stop'):
 
+                attrs = node.attributes
+                attrs['lon'] = node.lon
+                attrs['lat'] = node.lat
                 PublicTransportStop(ml = self,
-                                    attributes = node.attributes,
+                                    attributes = attrs,
                                     tags = node.tags)
             else:
                 Node(ml = self,
@@ -179,7 +182,7 @@ class Primitive:
         for key in self.attributes:
             r += "{}: {},  ".format(key, self.attributes[key])
         for key in self.tags:
-            r += "{}: {}\n".format(key, self.tags[key])
+            r += "\n{}: {}".format(key, self.tags[key])
         return r
 
     @property
@@ -217,12 +220,12 @@ class Primitive:
             _outputparams = outputparams
         _outputparams['primitive'] = self.primitive
         self.xml = '{newline}<{primitive} '.format(**_outputparams)
-        for attr in ['id', 'lat', 'lon', 'action', 'timestamp', 'uid', 'user', 'visible', 'version', 'changeset']:
+        for attr in ['id', 'action', 'timestamp', 'uid', 'user', 'visible', 'version', 'changeset', 'lat', 'lon']:
             if attr in self.attributes:
                 if attr == 'timestamp':
                     self.attributes[attr] = str(self.attributes[attr]).replace(' ', 'T').replace('Z', '') + 'Z'
-                if attr == 'user':
-                    self.attributes[attr] = self.attributes[attr]
+                #if attr == 'user':
+                #    self.attributes[attr] = self.attributes[attr]
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         for key in self.tags:
