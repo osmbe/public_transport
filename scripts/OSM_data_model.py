@@ -1,6 +1,6 @@
 #!/bin/python
 from urllib.parse import urlencode
-from xml.sax.saxutils import escape, quoteattr
+from xml.sax.saxutils import escape #, quoteattr
 
 class MapLayer():
     def __init__(self):
@@ -226,9 +226,8 @@ class Primitive:
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         for key in self.tags:
-            # self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=str(self.tags[key]), **_outputparams)
-            self.xml += escape("{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key],
-                                                                              **_outputparams))
+            self.xml += "{newline}{indent}<tag k='{key}' v='{value}' />".format(key=key, value=escape(self.tags[key]),
+                                                                              **_outputparams)
         if body:
             self.xml += body
         self.xml += '{newline}</{primitive}>'.format(**_outputparams)
