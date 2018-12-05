@@ -108,7 +108,7 @@ class MapLayer():
             xml += self.relations[r].to_xml(outputparams=outputparams)
 
         xml += '''{newline}</osm>'''.format(**outputparams)
-        return escape(xml)
+        return xml
 
     def to_url(self, upload=False, generator='Python script', new_layer=True, layer_name=''):
         """
@@ -227,8 +227,8 @@ class Primitive:
         self.xml += '>'
         for key in self.tags:
             # self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=str(self.tags[key]), **_outputparams)
-            self.xml += "{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key],
-                                                                              **_outputparams)
+            self.xml += escape("{newline}{indent}<tag k='{key}' v='{tag}' />".format(key=key, tag=self.tags[key],
+                                                                              **_outputparams))
         if body:
             self.xml += body
         self.xml += '{newline}</{primitive}>'.format(**_outputparams)
