@@ -226,7 +226,7 @@ class Primitive:
                 self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
         self.xml += '>'
         for key in self.tags:
-            self.xml += "{newline}{indent}<tag k='{key}' v='{value}' />".format(key=key, value=escape(self.tags[key]),
+            self.xml += "{newline}{indent}<tag k='{key}' v='{value}' />".format(key=key, value=escape(str(self.tags[key])),
                                                                               **_outputparams)
         if body:
             self.xml += body
