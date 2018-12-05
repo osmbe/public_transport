@@ -1,6 +1,6 @@
 #!/bin/python
 from urllib.parse import urlencode
-#from xml.sax.saxutils import escape, quoteattr
+from xml.sax.saxutils import escape, quoteattr
 
 class MapLayer():
     def __init__(self):
@@ -108,7 +108,7 @@ class MapLayer():
             xml += self.relations[r].to_xml(outputparams=outputparams)
 
         xml += '''{newline}</osm>'''.format(**outputparams)
-        return xml
+        return escape(xml)
 
     def to_url(self, upload=False, generator='Python script', new_layer=True, layer_name=''):
         """
