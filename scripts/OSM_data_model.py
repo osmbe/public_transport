@@ -35,14 +35,13 @@ class MapLayer():
     def from_overpy(self, osmdata):
         for node in osmdata.nodes:
             node.attributes['id'] = node.id
+            node.attributes['lon'] = node.lon
+            node.attributes['lat'] = node.lat
             if ('highway' in node.tags and node.tags['highway'] == 'bus_stop' or
                 'railway' in node.tags and node.tags['railway'] == 'tram_stop'):
 
-                attrs = node.attributes
-                attrs['lon'] = node.lon
-                attrs['lat'] = node.lat
                 PublicTransportStop(ml = self,
-                                    attributes = attrs,
+                                    attributes = node.attributes,
                                     tags = node.tags)
             else:
                 Node(ml = self,
