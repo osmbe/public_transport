@@ -52,7 +52,8 @@ class MapLayer():
             way.attributes['id'] = way.id
             Way(ml = self,
                 attributes = way.attributes,
-                tags = way.tags)
+                tags = way.tags
+                nodes = way.nodes)
 
         for rel in osmdata.relations:
             members = []
