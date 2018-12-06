@@ -400,9 +400,45 @@ class PublicTransportRoute(Relation):
             self.tags = []
         else:
             self.tags = tags
+
+        self.members = members
+        self.stops = []
+        self.ways = []
+
+        if self.members:
+            self.inventorise_members()
+
         self.tags['type'] = 'route'
-        super().__init__(ml, members=members, attributes=attributes, tags=self.tags)
+        super().__init__(ml, members=self.members, attributes=attributes, tags=self.tags)
         self.continuous = None
+
+    def inventorise_members(self):
+        # split route relation members into stops and ways
+        for member in self.members:
+            if member.primitive == 'node':
+                node = self.maplayer.nodes[member.memberid]
+                if (node.tags['highway'] == 'bus_stop' or
+                    node.tags['railway'] == 'tram_stop' or
+                    node.tags['public_transport'] in ['platform', 'stop_position']):
+                    self.stops.append(node)
+            if member.primitive == 'way':
+                way = self.maplayer.ways[member.memberid]
+
+                if (way.tags['highway'] != 'platform' and
+                    way.tags['railway'] == 'platform'):
+                    self.ways.append(way)
+
+    def update_stops(self, new_stops_sequence):
+        if not(self.stops):
+            self.inventorise_members()
+        self.stops = new_stops_sequence
+
+        self.members = []
+        for stop in self.stops:
+            self.members.append(stop)
+        for way in self.ways:
+            self.members.append(way)
+        self.modified = True
 
     def is_continuous(self):
         last_node_of_previous_way = None
