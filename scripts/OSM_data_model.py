@@ -415,13 +415,13 @@ class PublicTransportRoute(Relation):
     def inventorise_members(self):
         # split route relation members into stops and ways
         for member in self.members:
-            if member.primitive == 'node':
+            if member.primtype == 'node':
                 node = self.maplayer.nodes[member.memberid]
                 if (node.tags['highway'] == 'bus_stop' or
                     node.tags['railway'] == 'tram_stop' or
                     node.tags['public_transport'] in ['platform', 'stop_position']):
                     self.stops.append(node)
-            if member.primitive == 'way':
+            if member.primtype == 'way':
                 way = self.maplayer.ways[member.memberid]
 
                 if (way.tags['highway'] != 'platform' and
