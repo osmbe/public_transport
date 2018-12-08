@@ -1,5 +1,6 @@
 #!/bin/python3
 from typing import List
+from types import StringType
 from urllib.parse import urlencode
 import xml.etree.ElementTree as eT
 
@@ -78,7 +79,10 @@ class MapLayer:
         :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         """
+        assert type(upload) is StringType, "upload is not a string: %r" % upload
         xml_attributes = {'version': '0.6', 'upload': upload}
+
+        assert type(generator) is StringType, "generator is not a string: %r" % generator
         if generator:
             xml_attributes['generator'] = generator
         osm_xml_root = eT.Element('osm', attrib=xml_attributes)
@@ -200,12 +204,14 @@ class Primitive:
     def xml(self):
         xml_attributes = {}
         for attr in self.attributes:
+            assert type(attr) is StringType, "attr is not a string: %r" % attr
             if attr == 'timestamp':
                 xml_attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
             elif self.attributes[attr] is not None:
                 xml_attributes[attr] = str(self.attributes[attr])
         _xml = eT.Element(self.primitive, attrib=xml_attributes)
         for key in self.tags:
+            assert type(key) is StringType, "key is not a string: %r" % key
             if str(self.tags[key]) is not None:
                 _xml.extend([eT.Element('tag', attrib={'k': key,
                                                        'v': str(self.tags[key])
@@ -278,10 +284,11 @@ class Way(Primitive):
     def xml(self):
         way = super().xml  # type: eT.Element
         for nd in self.nodes:
+            assert type(nd) is StringType, "nd is not a string: %r" % nd
             if nd is not None:
-                way.extend([eT.Element('nd', attrib={'ref': nd}
-                                   )
-                        ])
+                way.extend([eT.Element('nd', attrib={'ref': str(nd)}
+                                       )
+                            ])
         return way
 
     def is_closed(self):
@@ -311,14 +318,13 @@ class RelationMember(object):
             cls._instances[key] = instance
             return instance
 
-    def __init__(self, role="", primitive_type="", member=None):
+    def __init__(self, member, role="", primitive_type=""):
         """
         :type role: str
         :type primitive_type: str
         :type member [Primitive, str, int]
         """
         self.role = role
-        self.primitive_type = primitive_type
         self.member = None
 
         if isinstance(member, Primitive):
@@ -326,14 +332,23 @@ class RelationMember(object):
             self.member = member
         elif isinstance(member, str):
             self.id = member.strip()
-        else:
+        elif isinstance(member, int):
             self.id = str(member)
+        else:
+            raise ValueError("The id should either come from the primitive or be passed as a parameter")
 
         if self.member:
             self.primitive_type = member.primitive
+        elif primitive_type:
+            self.primitive_type = primitive_type
+        else:
+            raise ValueError("It should either be possible to infer the primitive's type from member, or passed as a parameter")
 
     @property
     def xml(self):
+        assert type(self.primitive_type) is StringType, "self.primitive_type is not a string: %r" % self.primitive_type
+        assert type(self.id) is StringType, "self.id is not a string: %r" % self.id
+        assert type(self.role) is StringType, "self.role is not a string: %r" % self.role
         return eT.Element('member', attrib={'type': self.primitive_type,
                                             'ref': self.id,
                                             'role': self.role})
@@ -370,6 +385,7 @@ class Relation(Primitive):
     def xml(self):
         rel = super().xml
         for member in self.members:
+            assert type(member) is StringType, "member is not a string: %r" % member
             rel.extend([member.xml])
 
         return rel
@@ -609,34 +625,35 @@ class Edge:
         return ways
 
 
-'''
-ml = MapLayer()
-n1 = Node(ml)
-n2 = Node(ml)
-n3 = Node(ml)
-n4 = Node(ml)
-n5 = Node(ml)
-n6 = Node(ml)
-n7 = Node(ml)
-n8 = Node(ml)
+if __name__ == '__main__':
+    ml = MapLayer()
+    n1 = Node(ml)
+    n2 = Node(ml)
+    n3 = Node(ml)
+    n4 = Node(ml)
+    n5 = Node(ml)
+    n6 = Node(ml)
+    n7 = Node(ml)
+    n8 = Node(ml)
 
-w1 = Way(ml, nodes=[n1, n2])
-print(eT.tostring(w1.xml, encoding='UTF-8'))
-w2 = Way(ml, nodes=[n2, n3, n4])
-w3 = Way(ml, nodes=[n4, n5])
-w4 = Way(ml, nodes=[n5, n6])
-w5 = Way(ml, nodes=[n6, n7])
-w6 = Way(ml, nodes=[n7, n8])
-print(eT.tostring(w6.xml, encoding='UTF-8'))
+    w1 = Way(ml, nodes=[n1, n2])
+    print(eT.tostring(w1.xml, encoding='UTF-8'))
+    w2 = Way(ml, nodes=[n2, n3, n4])
+    w3 = Way(ml, nodes=[n4, n5])
+    w4 = Way(ml, nodes=[n5, n6])
+    w5 = Way(ml, nodes=[n6, n7])
+    w6 = Way(ml, nodes=[n7, n8])
+    print(eT.tostring(w6.xml, encoding='UTF-8'))
 
-e1 = Edge(ml, parts = [w1, w2])
-e2 = Edge(ml, parts = [w3])
-e3 = Edge(ml, parts = [w4, w5])
-e4 = Edge(ml, parts = [w6])
+    e1 = Edge(ml, parts=[w1, w2])
+    e2 = Edge(ml, parts=[w3])
+    e3 = Edge(ml, parts=[w4, w5])
+    e4 = Edge(ml, parts=[w6])
 
-print(e1.get_ways())
-print(e2.get_ways())
-print(e3.get_ways())
-print(e4.get_ways())
-print(eT.tostring(ml.xml(), encoding='UTF-8'))
-'''
+    print(e1.get_ways())
+    print(e2.get_ways())
+    print(e3.get_ways())
+    print(e4.get_ways())
+    print(eT.tostring(ml.xml(), encoding='UTF-8'))
+
+    rm1 = RelationMember(role="", member=w1)
