@@ -1,7 +1,7 @@
 #!/bin/python3
 from typing import List
 from urllib.parse import urlencode
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as eT
 
 
 class MapLayer:
@@ -39,16 +39,16 @@ class MapLayer:
             node.attributes['id'] = node.id
             node.attributes['lon'] = node.lon
             node.attributes['lat'] = node.lat
-            Stop(ml=self, primitive=Node(ml=self,
-                                         attributes=node.attributes,
-                                         tags=node.tags))
+            Stop(map_layer=self, primitive=Node(map_layer=self,
+                                                attributes=node.attributes,
+                                                tags=node.tags))
 
         for way in osm_data.ways:
             way.attributes['id'] = way.id
-            Stop(ml=self, primitive=Way(ml=self,
-                                        attributes=way.attributes,
-                                        tags=way.tags,
-                                        nodes=way.nodes))
+            Stop(map_layer=self, primitive=Way(map_layer=self,
+                                               attributes=way.attributes,
+                                               tags=way.tags,
+                                               nodes=way.nodes))
 
         for rel in osm_data.relations:
             members = []
@@ -59,21 +59,19 @@ class MapLayer:
                                )
             rel.attributes['id'] = rel.id
 
-            kwargs = {'ml': self,
-                      'attributes': rel.attributes,
-                      'tags': rel.tags,
-                      'members': members}
+            rltn = Relation(map_layer=self,
+                            attributes=rel.attributes,
+                            tags=rel.tags,
+                            members=members)
 
             if 'type' in rel.tags:
                 if rel.tags['type'] == 'route':
-                    Itinerary(**kwargs)
+                    Itinerary(map_layer=self, route_relation=rltn)
                     continue
 
                 elif rel.tags['type'] == 'route_master':
-                    Line(**kwargs)
+                    Line(map_layer=self, route_master_relation=rltn)
                     continue
-            else:
-                Relation(**kwargs)
 
     def xml(self, upload='false', generator=''):
         """
@@ -81,7 +79,7 @@ class MapLayer:
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         """
 
-        osm_xml_root = ET.Element('osm', attrib={'version': '0.6',
+        osm_xml_root = eT.Element('osm', attrib={'version': '0.6',
                                                  'upload': upload,
                                                  'generator': generator})
 
@@ -97,7 +95,7 @@ class MapLayer:
         :type new_layer: bool set to False to add data to currently open layer in JOSM
         :type layer_name: string name for the layer to be created if new_layer=True
         """
-        values = {'data': ET.tostring(self.xml(upload=upload,
+        values = {'data': eT.tostring(self.xml(upload=upload,
                                                generator=generator),
                                       encoding='UTF-8'
                                       ).decode('UTF-8')
@@ -135,8 +133,8 @@ class Primitive:
     """Base class with common functionality between Nodes, Ways and Relations"""
     counter = -10000
 
-    def __init__(self, ml, primitive, attributes=None, tags=None):
-        self.maplayer = ml
+    def __init__(self, map_layer, primitive, attributes=None, tags=None):
+        self.maplayer = map_layer
 
         if attributes:
             self.attributes = attributes
@@ -182,11 +180,10 @@ class Primitive:
 
     def add_tags(self, tags, mark_modified=True):
         """
-        :type tags: list[str]
-        :type mark_modified: bool
+       :type mark_modified: bool
         """
         if tags:
-            for key in tags:  # type: str
+            for key in tags:
                 self.add_tag(key, tags[key], mark_modified=mark_modified)
 
     def add_tag(self, key, value, mark_modified=True):
@@ -203,9 +200,9 @@ class Primitive:
     def xml(self):
         if 'timestamp' in self.attributes:
             self.attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
-        _xml = ET.Element(self.primitive, attrib=self.attributes)
+        _xml = eT.Element(self.primitive, attrib=self.attributes)
         for key in self.tags:
-            _xml.extend([ET.Element('tag', attrib={'k': key,
+            _xml.extend([eT.Element('tag', attrib={'k': key,
                                                    'v': self.tags[key]
                                                    }
                                     )
@@ -224,25 +221,25 @@ class Primitive:
 
 
 class Node(Primitive):
-    def __init__(self, ml, attributes=None, tags=None):
+    def __init__(self, map_layer, attributes=None, tags=None):
         if not attributes:
             attributes = {'lon': '0.0', 'lat': '0.0'}
 
-        super().__init__(ml, primitive='node', attributes=attributes, tags=tags)
-        ml.primitives['nodes'][self.attributes['id']] = self
+        super().__init__(map_layer, primitive='node', attributes=attributes, tags=tags)
+        map_layer.primitives['nodes'][self.attributes['id']] = self
 
 
 class Way(Primitive):
-    def __init__(self, ml, attributes=None, nodes=None, tags=None):
+    def __init__(self, map_layer, attributes=None, nodes=None, tags=None):
         """Ways are built up as an ordered sequence of nodes
            it can happen we only know the id of the node,
            or we might have a Node object with all the details"""
-        super().__init__(ml, primitive='way', attributes=attributes, tags=tags)
+        super().__init__(map_layer, primitive='way', attributes=attributes, tags=tags)
 
         self.nodes = []
         if nodes:
             self.add_nodes(nodes)
-        ml.primitives['ways'][self.attributes['id']] = self
+        map_layer.primitives['ways'][self.attributes['id']] = self
         self.closed = None
         self.incomplete = None  # not all nodes are downloaded
 
@@ -276,7 +273,7 @@ class Way(Primitive):
     def xml(self):
         way = super().xml  # type: ET.Element
         for nd in self.nodes:
-            way.extend([ET.Element('nd', attrib={'ref': nd}
+            way.extend([eT.Element('nd', attrib={'ref': nd}
                                    )
                         ])
         return way
@@ -326,33 +323,26 @@ class RelationMember(object):
         else:
             self.id = str(member)
 
-        # if not self.member:
-        #     if self.id in ml.nodes:
-        #         self.member = ml.nodes[self.id]
-        #     if self.id in ml.ways:
-        #         self.member = ml.ways[self.id]
-        #     if self.id in ml.relations:
-        #         self.member = ml.relations[self.id]
         if self.member:
             self.primitive_type = member.primitive
 
     @property
     def xml(self):
-        return ET.Element('member', attrib={'type': self.primitive_type,
+        return eT.Element('member', attrib={'type': self.primitive_type,
                                             'ref': self.id,
                                             'role': self.role})
 
 
 class Relation(Primitive):
-    def __init__(self, ml, members=None, tags=None, attributes=None):
-        super().__init__(ml, primitive='relation', attributes=attributes, tags=tags)
+    def __init__(self, map_layer, members=None, tags=None, attributes=None):
+        super().__init__(map_layer, primitive='relation', attributes=attributes, tags=tags)
 
         if not members:
             self.members = []
         else:
             self.members = members
 
-        ml.primitives['relations'][self.attributes['id']] = self
+        map_layer.primitives['relations'][self.attributes['id']] = self
         self.incomplete = None  # not all members are downloaded
 
     def __repr__(self):
@@ -383,12 +373,12 @@ class Stop:
     """Stops can consist of just a platform node, or a stop_position,
        or a stop_position combined with a platform node or way."""
 
-    def __init__(self, ml, primitive=None):
+    def __init__(self, map_layer, primitive=None):
         """
-        :type ml: MapLayer
+        :type map_layer: MapLayer
         :type primitive: Primitive
         """
-        self.map_layer = ml
+        self.map_layer = map_layer
         self.stop_position_node = None
         self.platform_node = None
         self.platform_way = None
@@ -417,7 +407,7 @@ class Stop:
                 elif (pt_tag and primitive.member.tags['public_transport'] == 'stop_position'):
                     self.stop_position_node = primitive
             if isinstance(primitive.member, Way):
-                if (pt_tag and primitive.member.tags['public_transport'] == 'platform'):
+                if pt_tag and primitive.member.tags['public_transport'] == 'platform':
                     self.platform_way = primitive
         elif isinstance(primitive, Node):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
@@ -425,7 +415,7 @@ class Stop:
                 self.platform_node = RelationMember(role='platform',
                                                     primitive_type='node',
                                                     member=primitive)
-            elif (pt_tag and primitive.tags['public_transport'] == 'stop_position'):
+            elif pt_tag and primitive.tags['public_transport'] == 'stop_position':
                 self.stop_position_node = RelationMember(role='stop',
                                                          primitive_type='node',
                                                          member=primitive)
@@ -456,36 +446,40 @@ class Itinerary:
 
        In OpenStreetMap it is mapped as a route relation"""
 
-    def __init__(self, ml, route_relation=None, mode_of_transport=None,
-                 stops=None, ways=None, tags=None, attributes=None):
+    def __init__(self, map_layer, route_relation=None, mode_of_transport=None,
+                 stops=None, ways=None, extratags=None):
         """Either  there is a route relation, or one will be created based on the values in
            stops, ways and tags.
-           :type ml: MapLayer
+           :type map_layer: MapLayer
            :type stops: List[RelationMember]
            :type ways:  List[Way]"""
-        self.map_layer = ml
+        self.map_layer = map_layer
         if stops is None:
             self.stops = []
         else:
             self.stops = stops
+
         if ways is None:
             self.ways = []
         else:
             self.ways = ways
 
-        if route_relation is None:
-            self.mode_of_transport = mode_of_transport
-            if tags is None:
-                tags = {'type': 'route',
-                        'route': self.mode_of_transport,
-                        'public_transport:version': '2'}
-            else:
-                tags = tags
+        if extratags is None:
+            tags = {}
+        else:
+            tags = extratags
 
-            self.route = Relation(ml,
-                                  members=self.stops,  # TODO needs more work .extend([self.ways]),
-                                  tags=tags,
-                                  attributes=attributes)
+        if mode_of_transport:
+            self. mode_of_transport = mode_of_transport
+
+        if route_relation is None:
+            tags['type'] = 'route'
+            tags['route'] = self.mode_of_transport
+            tags['public_transport:version'] = '2'
+
+            self.route = Relation(map_layer,
+                                  members=self.stops + self.ways,
+                                  tags=tags)
         else:
             self.route = route_relation
             self.mode_of_transport = self.route.tags['route']
@@ -552,32 +546,24 @@ class Line:
 
        In OpenStreetMap it is mapped as a route_master relation"""
 
-    def __init__(self, ml, route_master_relation=None, members=None,
-                 tags=None, attributes=None):
-        """ :type members: list[RelationMember]
-            :type ml: MapLayer
+    def __init__(self, map_layer, route_master_relation=None, extratags=None):
+        """:type map_layer: MapLayer
         """
-        self.map_layer = ml
-        if tags is None:
-            self.tags = []
-        else:
-            self.tags = tags
+        self.map_layer = map_layer
+
         if route_master_relation is None:
-            if tags is None:
+            if extratags is None:
                 tags = {'type': 'route_master'}
             else:
-                tags = tags
+                tags = extratags
 
-            self.route_master = Relation(ml,
-                                         members=members,
-                                         tags=tags,
-                                         attributes=attributes)
+            self.route_master = Relation(map_layer,
+                                         tags=tags)
         else:
             self.route_master = route_master_relation
 
     def add_route(self, route_relation):
-        self.route_master.add_member(RelationMember(self.map_layer,
-                                                    role='',
+        self.route_master.add_member(RelationMember(role='',
                                                     primitive_type='relation',
                                                     member=route_relation.route))
 
@@ -590,7 +576,6 @@ class Edge:
         self.parts = []
         if parts:
             self.add_parts(parts)
-        # ml.edges[self.attributes['id']] = self
 
     def add_parts(self, parts: Way):
         for p in parts:
@@ -625,13 +610,13 @@ n7 = Node(ml)
 n8 = Node(ml)
 
 w1 = Way(ml, nodes=[n1, n2])
-print(ET.tostring(w1.xml, encoding='UTF-8'))
+print(eT.tostring(w1.xml, encoding='UTF-8'))
 w2 = Way(ml, nodes=[n2, n3, n4])
 w3 = Way(ml, nodes=[n4, n5])
 w4 = Way(ml, nodes=[n5, n6])
 w5 = Way(ml, nodes=[n6, n7])
 w6 = Way(ml, nodes=[n7, n8])
-print(ET.tostring(w6.xml, encoding='UTF-8'))
+print(eT.tostring(w6.xml, encoding='UTF-8'))
 '''
 e1 = Edge(ml, parts = [w1, w2])
 e2 = Edge(ml, parts = [w3])
@@ -644,4 +629,4 @@ print(e3.get_ways())
 print(e4.get_ways())
 '''
 
-print(ET.tostring(ml.xml(), encoding='UTF-8'))
+print(eT.tostring(ml.xml(), encoding='UTF-8'))
