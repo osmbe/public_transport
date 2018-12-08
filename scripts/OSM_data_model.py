@@ -248,7 +248,7 @@ class Way(Primitive):
 
         self.nodes = []
         if nodes:
-            self.add_nodes(nodes)
+            self.add_nodes(nodes, mark_modified=False)
         map_layer.primitives['ways'][self.attributes['id']] = self
         self.closed = None
         self.incomplete = None  # not all nodes are downloaded
@@ -265,12 +265,12 @@ class Way(Primitive):
     def __getitem__(self, position):
         return self.nodes[position]
 
-    def add_nodes(self, nodes):
+    def add_nodes(self, nodes, mark_modified=True):
         for n in nodes:
-            self.add_node(n)
+            self.add_node(n, mark_modified)
         self.is_closed()
 
-    def add_node(self, node):
+    def add_node(self, node, mark_modified=True):
         try:
             """ did we receive an object instance to work with? """
             n = node.attributes['id']
@@ -278,6 +278,8 @@ class Way(Primitive):
             """ we received a string """
             n = node
         self.nodes.append(str(n))
+        if mark_modified:
+            self.modified = True
 
     @property
     def xml(self):
@@ -375,13 +377,15 @@ class Relation(Primitive):
 
         return r + super().__repr__()
 
-    def add_members(self, members):
+    def add_members(self, members, mark_modified=True):
         if members:
             for m in members:
-                self.add_member(m)
+                self.add_member(m, mark_modified)
 
-    def add_member(self, member):
+    def add_member(self, member, mark_modified=True):
         self.members.append(member)
+        if mark_modified:
+            self.modified = True
 
     @property
     def xml(self):
@@ -424,8 +428,10 @@ class Stop:
                 # node of a highway suitable for the mode of transport
                 pt_tag = "public_transport" in primitive.member.tags
                 hw_tag = "highway" in primitive.member.tags
+                rw_tag = "railway" in primitive.member.tags
                 if (pt_tag and primitive.member.tags['public_transport'] == 'platform' or
-                        hw_tag and primitive.member.tags['highway'] == 'bus_stop'):
+                        hw_tag and primitive.member.tags['highway'] == 'bus_stop' or
+                        rw_tag and primitive.member.tags['railway'] == 'tram_stop'):
                     self.platform_node = primitive
                 elif (pt_tag and primitive.member.tags['public_transport'] == 'stop_position'):
                     self.stop_position_node = primitive
@@ -539,10 +545,9 @@ class Itinerary:
 
         self.route.members = []  # type: List[Primitive]
         for stop in self.stops:
-            self.route.members.append(stop)
+            self.route(stop)
         for way in self.ways:
             self.route.members.append(way)
-        self.route = True
 
     @property
     def is_continuous(self) -> [bool, None]:
