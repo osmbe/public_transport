@@ -1,67 +1,62 @@
-#!/bin/python
+#!/bin/python3
+from typing import List
 from urllib.parse import urlencode
-from xml.sax.saxutils import escape#, quoteattr
+import xml.etree.ElementTree as ET
 
-class MapLayer():
+
+class MapLayer:
     def __init__(self):
-        self.nodes = {}
-        self.ways = {}
-        self.relations = {}
+        self.primitives = {'nodes': {},
+                           'ways': {},
+                           'relations': {}
+                           }
         self.edges = {}
-        self.modified = []  # list of all 'dirty' objects that need to be flagged for upload
+        self.modified_primitives = []
 
     def get_primitive(self, primitive):
-        prim = primitive[0]
-        id = primitive[1:]
+        prim = primitive[0]  # type: str
+        primitive_id = primitive[1:]  # type: str
         if prim == 'n':
-            if id in self.nodes:
-                return self.nodes[id]
+            if primitive_id in self.primitives['nodes']:
+                return self.primitives['nodes'][primitive_id]
             else:
-                raise ValueError('id ' + id + ' not found in nodes')
+                raise ValueError('id ' + primitive_id + ' not found in nodes')
         elif prim == 'w':
-            if id in self.nodes:
-                return self.ways[id]
+            if primitive_id in self.primitives['nodes']:
+                return self.primitives['ways'][primitive_id]
             else:
-                raise ValueError('id ' + id + ' not found in ways')
+                raise ValueError('id ' + primitive_id + ' not found in ways')
         elif prim == 'r':
-            if id in self.nodes:
-                return self.relations[id]
+            if primitive_id in self.primitives['nodes']:
+                return self.primitives['relations'][primitive_id]
             else:
-                raise ValueError('id ' + id + ' not found in relations')
+                raise ValueError('id ' + primitive_id + ' not found in relations')
         else:
             raise ValueError('id should start with n, w or r')
 
-
-    def from_overpy(self, osmdata):
-        for node in osmdata.nodes:
+    def from_overpy(self, osm_data):
+        for node in osm_data.primitives['nodes']:
             node.attributes['id'] = node.id
             node.attributes['lon'] = node.lon
             node.attributes['lat'] = node.lat
-            if ('highway' in node.tags and node.tags['highway'] == 'bus_stop' or
-                'railway' in node.tags and node.tags['railway'] == 'tram_stop'):
+            Stop(ml=self, primitive=Node(ml=self,
+                                         attributes=node.attributes,
+                                         tags=node.tags))
 
-                PublicTransportStop(ml = self,
-                                    attributes = node.attributes,
-                                    tags = node.tags)
-            else:
-                Node(ml = self,
-                     attributes = node.attributes,
-                     tags = node.tags)
-
-        for way in osmdata.ways:
+        for way in osm_data.primitives['ways']:
             way.attributes['id'] = way.id
-            Way(ml = self,
-                attributes = way.attributes,
-                tags = way.tags,
-                nodes = way.nodes)
+            Stop(ml=self, primitive=Way(ml=self,
+                                        attributes=way.attributes,
+                                        tags=way.tags,
+                                        nodes=way.nodes))
 
-        for rel in osmdata.relations:
+        for rel in osm_data.primitives['relations']:
             members = []
             for member in rel.members:
-                members.append(RelationMember(member = str(member.ref),
-                                              role = member.role,
-                                              primtype = member._type_value)
-                              )
+                members.append(RelationMember(member=str(member.ref),
+                                              role=member.role,
+                                              primitive_type=member._type_value)
+                               )
             rel.attributes['id'] = rel.id
 
             kwargs = {'ml': self,
@@ -70,57 +65,43 @@ class MapLayer():
                       'members': members}
 
             if 'type' in rel.tags:
-                if rel.tags['type'] ==   'route':
-                    rt =   PublicTransportRoute(**kwargs)
+                if rel.tags['type'] == 'route':
+                    Itinerary(**kwargs)
                     continue
 
                 elif rel.tags['type'] == 'route_master':
-                    rm =   PublicTransportRouteMaster(**kwargs)
+                    Line(**kwargs)
                     continue
 
             Relation(**kwargs)
 
-    def to_xml(self, output='doc', upload=False, generator='Python script'):
+    def xml(self, upload='false', generator=''):
         """
-        :type output: string doc for formatted file output, url for concise output
+        :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         """
-        outputparams = {}
-        if output == 'url':
-            outputparams['newline'] = ''
-            outputparams['indent'] = ''
-        else:
-            outputparams['newline'] = '\n'
-            outputparams['indent'] = '  '
-        if upload is False:
-            outputparams["upload"] = " upload='false'"
-        else:
-            outputparams["upload"] = ""
-        if generator:
-            outputparams["generator"] = " generator='{}'".format(generator)
-        else:
-            outputparams["generator"] = ""
-        xml = '''<?xml version='1.0' encoding='UTF-8'?>{newline}<osm version='0.6'{upload}{generator}>{newline}'''.format(
-            **outputparams)
 
-        for n in self.nodes:
-            xml += self.nodes[n].to_xml(outputparams=outputparams)
-        for w in self.ways:
-            xml += self.ways[w].to_xml(outputparams=outputparams)
-        for r in self.relations:
-            xml += self.relations[r].to_xml(outputparams=outputparams)
+        osm_xml_root = ET.Element('osm', attrib={'version': '0.6',
+                                                 'upload': upload,
+                                                 'generator': generator})
 
-        xml += '''{newline}</osm>'''.format(**outputparams)
-        return xml
+        for primtype in ('nodes', 'ways', 'relations'):
+            for prim_id in self.primitives[primtype]:
+                osm_xml_root.extend([self.primitives[primtype][prim_id].xml])
+        return osm_xml_root
 
-    def to_url(self, upload=False, generator='Python script', new_layer=True, layer_name=''):
+    def url(self, upload='false', generator='', new_layer=True, layer_name=''):
         """
-        :type output: string doc for formatted file output, url for concise output
+        :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         :type new_layer: bool set to False to add data to currently open layer in JOSM
         :type layer_name: string name for the layer to be created if new_layer=True
         """
-        values = {'data': self.to_xml(output='url', upload=upload, generator=generator)}
+        values = {'data': ET.tostring(self.xml(upload=upload,
+                                               generator=generator),
+                                      encoding='UTF-8'
+                                      ).decode('UTF-8')
+                  }
         if new_layer is False:
             values['new_layer'] = 'false'
         else:
@@ -131,19 +112,20 @@ class MapLayer():
 
         return "http://localhost:8111/load_data?" + urlencode(values)
 
-    def to_link(self, upload=False, generator='Python script', new_layer=True, layer_name='', linktext=''):
+    def http_link(self, upload='false', generator='',
+                  new_layer=True, layer_name='', linktext=''):
         """
-        :type output: string doc for formatted file output, url for concise output
+        :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         :type new_layer: bool set to False to add data to currently open layer in JOSM
         :type layer_name: string name for the layer to be created if new_layer=True
         :type linktext: string text to show on the link
         """
         params = {'linktext': linktext,
-                  'url': self.to_url(upload=upload,
-                                     generator=generator,
-                                     new_layer=new_layer,
-                                     layer_name=layer_name)
+                  'url': self.url(upload=upload,
+                                  generator=generator,
+                                  new_layer=new_layer,
+                                  layer_name=layer_name)
                   }
         print(params)
         return '<a href="{url}">{linktext}</a>'.format(**params)
@@ -154,9 +136,6 @@ class Primitive:
     counter = -10000
 
     def __init__(self, ml, primitive, attributes=None, tags=None):
-        """
-        :type output: string doc for formatted file output, url for concise output
-        """
         self.maplayer = ml
 
         if attributes:
@@ -168,8 +147,6 @@ class Primitive:
         else:
             self.tags = {}
         self.primitive = primitive
-
-        self.xml = ''
 
         if not ('id' in self.attributes):
             self.modified = True
@@ -201,47 +178,46 @@ class Primitive:
     def modified(self, modified_flag):
         if modified_flag:
             self.attributes['action'] = 'modify'
-            self.maplayer.modified.append(self)
+            self.maplayer.modified_primitives.append(self)
 
     def add_tags(self, tags, mark_modified=True):
+        """
+        :type tags: list[str]
+        :type mark_modified: bool
+        """
         if tags:
-            for key in tags:
+            for key in tags:  # type: str
                 self.add_tag(key, tags[key], mark_modified=mark_modified)
 
     def add_tag(self, key, value, mark_modified=True):
+        """
+        :type key str
+        :type value str
+        :type mark_modified: bool
+        """
         self.tags[key] = value
         if mark_modified:
             self.modified = True
 
-    def to_xml(self, outputparams=None, body=''):
-        if outputparams is None:
-            _outputparams = {'newline': '\n', 'indent': '  '}
-        else:
-            _outputparams = outputparams
-        _outputparams['primitive'] = self.primitive
-        self.xml = '{newline}<{primitive} '.format(**_outputparams)
-        for attr in ['id', 'action', 'timestamp', 'uid', 'user', 'visible', 'version', 'changeset', 'lat', 'lon']:
-            if attr in self.attributes:
-                if attr == 'timestamp':
-                    self.attributes[attr] = str(self.attributes[attr]).replace(' ', 'T').replace('Z', '') + 'Z'
-                #if attr == 'user':
-                #    self.attributes[attr] = self.attributes[attr]
-                self.xml += "{}='{}' ".format(attr, str(self.attributes[attr]), **_outputparams)
-        self.xml += '>'
+    @property
+    def xml(self):
+        if 'timestamp' in self.attributes:
+            self.attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
+        _xml = ET.Element(self.primitive, attrib=self.attributes)
         for key in self.tags:
-            self.xml += "{newline}{indent}<tag k='{key}' v='{value}' />".format(key=key, value=escape(str(self.tags[key])).replace("'","&apos;"),
-                                                                              **_outputparams)
-        if body:
-            self.xml += body
-        self.xml += '{newline}</{primitive}>'.format(**_outputparams)
-        return self.xml
+            _xml.extend([ET.Element('tag', attrib={'k': key,
+                                                   'v': self.tags[key]
+                                                   }
+                                    )
+                         ])
+        return _xml
 
     def get_parents(self):
         parents = []
-        for way in self.maplayer.ways:
+        for way in self.maplayer.primitives['ways']:
             if self.attributes['id'] in way.get_nodes():
                 parents.append(way)
-        for relation in self.maplayer.relations:
+        for relation in self.maplayer.primitives['relations']:
             if self.attributes['id'] in relation.get_members():
                 parents.append(relation)
         return parents
@@ -253,7 +229,7 @@ class Node(Primitive):
             attributes = {'lon': '0.0', 'lat': '0.0'}
 
         super().__init__(ml, primitive='node', attributes=attributes, tags=tags)
-        ml.nodes[self.attributes['id']] = self
+        ml.primitives['nodes'][self.attributes['id']] = self
 
 
 class Way(Primitive):
@@ -266,7 +242,7 @@ class Way(Primitive):
         self.nodes = []
         if nodes:
             self.add_nodes(nodes)
-        ml.ways[self.attributes['id']] = self
+        ml.primitives['ways'][self.attributes['id']] = self
         self.closed = None
         self.incomplete = None  # not all nodes are downloaded
 
@@ -289,22 +265,21 @@ class Way(Primitive):
 
     def add_node(self, node):
         try:
-            ''' did we receive an object instance to work with? '''
+            """ did we receive an object instance to work with? """
             n = node.attributes['id']
         except KeyError:
-            ''' we received a string '''
+            """ we received a string """
             n = node
         self.nodes.append(str(n))
 
-    def to_xml(self, outputparams=None, body=''):
-        if outputparams is None:
-            _outputparams = {'newline': '\n', 'indent': '  '}
-        else:
-            _outputparams = outputparams
-
-        for node in self.nodes:
-            body += "{newline}{indent}<nd ref='{node_id}' />".format(node_id=node, **_outputparams)
-        return super().to_xml(body=body)
+    @property
+    def xml(self):
+        way = super().xml  # type: ET.Element
+        for nd in self.nodes:
+            way.extend([ET.Element('nd', attrib={'ref': nd}
+                                   )
+                        ])
+        return way
 
     def is_closed(self):
         self.closed = False
@@ -312,28 +287,55 @@ class Way(Primitive):
             self.closed = True
 
 
-class RelationMember:
-    def __init__(self, role='', primtype='', member=None):
-        self.primtype = primtype
-        if role is None:
-            self.role = ''
-        else:
-            self.role = role
-        try:
-            m = member.strip()
-        except:
-            try:
-                ''' did we receive an object instance to work with? '''
-                m = member.attributes['id']
-                self.primtype = member.primitive
-            except (KeyError, NameError):
-                ''' the member id was passed as a string or an integer '''
-                m = member
-        self.memberid = str(m)
+class RelationMember(object):
+    _instances = {}
 
-    def to_xml(self, outputparams):
-        return "{newline}{indent}<member type='{primtype}' ref='{ref}' role='{role}' />".format(
-            primtype=self.primtype, ref=self.memberid, role=self.role, **outputparams)
+    def __new__(cls, *args, **kwargs):
+        role = kwargs['role']
+        primitive_type = kwargs['primtype']
+        member = kwargs['member']
+        if isinstance(member, Primitive):
+            member_id = member.id
+        elif isinstance(member, str):
+            member_id = member.strip()
+        else:
+            member_id = str(member)
+        key = (role, primitive_type[0], member_id)
+        if key in cls._instances:
+            return cls._instances[key]
+        else:
+            instance = object.__new__(cls)
+            cls._instances[key] = instance
+            return instance
+
+    def __init__(self, ml, role="", primitive_type="", member=None):
+        self.role = role
+        self.primitive_type = primitive_type
+        self.member = None
+
+        if isinstance(member, Primitive):
+            self.id = member.id
+            self.member = member
+        elif isinstance(member, str):
+            self.id = member.strip()
+        else:
+            self.id = str(member)
+
+        # if not self.member:
+        #     if self.id in ml.nodes:
+        #         self.member = ml.nodes[self.id]
+        #     if self.id in ml.ways:
+        #         self.member = ml.ways[self.id]
+        #     if self.id in ml.relations:
+        #         self.member = ml.relations[self.id]
+        if self.member:
+            self.primitive_type = member.primitive
+
+    @property
+    def xml(self):
+        return ET.Element('member', attrib={'type': self.primitive_type,
+                                            'ref': self.id,
+                                            'role': self.role})
 
 
 class Relation(Primitive):
@@ -345,7 +347,7 @@ class Relation(Primitive):
         else:
             self.members = members
 
-        ml.relations[self.attributes['id']] = self
+        ml.primitives['relations'][self.attributes['id']] = self
         self.incomplete = None  # not all members are downloaded
 
     def __repr__(self):
@@ -363,137 +365,224 @@ class Relation(Primitive):
     def add_member(self, member):
         self.members.append(member)
 
-    def to_xml(self, outputparams=None, body=''):
-        if outputparams is None:
-            _outputparams = {'newline': '\n', 'indent': '  '}
-        else:
-            _outputparams = outputparams
+    @property
+    def xml(self):
+        rel = super().xml
         for member in self.members:
-            body += member.to_xml(_outputparams)
+            rel.extend([member.xml])
 
-        return super().to_xml(outputparams=_outputparams, body=body)
-
-
-class PublicTransportStop(Node):
-    """"In this model a public transport stop is always mapped on a node with public_transport=platform tag
-
-       This is a simplification, which makes sure there are always coordinates. In most cases this node
-       represents the pole to which the flag with all details for the stop is mounted"""
-
-    def __init__(self, ml, attributes=None, tags=None):
-        super().__init__(ml, attributes, tags)
-        if tags is None:
-            self.tags['highway'] = 'bus_stop'
-            self.tags['public_transport'] = 'platform'
+        return rel
 
 
-class PublicTransportStopArea(Relation):
+class Stop:
+    """Stops can consist of just a platform node, or a stop_position,
+       or a stop_position combined with a platform node or way."""
+
+    def __init__(self, ml, primitive=None):
+        """
+        :type ml: MapLayer
+        :type primitive: Primitive
+        """
+        self.map_layer = ml
+        self.stop_position_node = None
+        self.platform_node = None
+        self.platform_way = None
+
+        if isinstance(primitive, Primitive):
+            self.add(primitive)
+
+    def add(self, primitive):
+        """ This method accepts both Node, Way and RelationMember instances
+            It analyses them and assigns them to the proper attribute
+            as a RelationMember
+            :type primitive: Primitive"""
+        if isinstance(primitive, RelationMember):
+            if isinstance(primitive.member, Node):
+                # It would be better to look at whether this node is a way
+                # node of a highway suitable for the mode of transport
+                if (primitive.member.tags['public_transport'] == 'platform' or
+                        primitive.member.tags['highway'] == 'bus_stop'):
+                    self.platform_node = primitive
+                elif primitive.member.tags['public_transport'] == 'stop_position':
+                    self.stop_position_node = primitive
+            if isinstance(primitive.member, Way):
+                if primitive.member.tags['public_transport'] == 'platform':
+                    self.platform_way = primitive
+        elif isinstance(primitive, Node):
+            if (primitive.tags['public_transport'] == 'platform' or
+                    primitive.tags['highway'] == 'bus_stop'):
+                self.platform_node = RelationMember(self.map_layer,
+                                                    role='platform',
+                                                    member=primitive)
+            elif primitive.tags['public_transport'] == 'stop_position':
+                self.stop_position_node = RelationMember(self.map_layer,
+                                                         role='stop',
+                                                         member=primitive)
+        elif isinstance(primitive, Way):
+            if (primitive.tags['public_transport'] == 'platform' or
+                    primitive.tags['highway'] == 'platform' or
+                    primitive.tags['railway'] == 'platform'):
+                self.platform_way = RelationMember(self.map_layer,
+                                                   role='platform',
+                                                   member=primitive)
+
+    @property
+    def get_stop_objects(self):
+        result = []  # type: List[RelationMember]
+        for o in [self.stop_position_node, self.platform_node, self.platform_way]:
+            if o:
+                assert isinstance(o, RelationMember)
+                result.append(o)
+        return result
+
+
+class StopArea:
     pass
 
 
-class PublicTransportRoute(Relation):
-    """This is what we think of as a variation of a line,
-       an ordered sequence of stops along an itinerary."""
+class Itinerary:
+    """An ordered sequence of stops along an itinerary.
 
-    def __init__(self, ml, members=None, tags=None, attributes=None):
-        if tags is None:
-            self.tags = []
+       In OpenStreetMap it is mapped as a route relation"""
+
+    def __init__(self, ml, route_relation=None, mode_of_transport=None,
+                 stops=None, ways=None, tags=None):
+        """Either  there is a route relation, or one will be created based on the values in
+           stops, ways and tags.
+           :type ml: MapLayer
+           :type stops: List[RelationMember]
+           :type ways:  List[Way]"""
+        self.map_layer = ml
+        if stops is None:
+            self.stops = []
         else:
-            self.tags = tags
+            self.stops = stops
+        if ways is None:
+            self.ways = []
+        else:
+            self.ways = ways
 
-        self.members = members
-        self.stops = []
-        self.ways = []
+        if route_relation is None:
+            self.mode_of_transport = mode_of_transport
+            if tags is None:
+                tags = {'type': 'route',
+                        'route': self.mode_of_transport,
+                        'public_transport:version': '2'}
+            else:
+                tags = tags
 
-        if self.members:
+            self.route = Relation(ml,
+                                  members=self.stops, # TODO needs more work .extend([self.ways]),
+                                  tags=tags)
+        else:
+            self.route = route_relation
+            self.mode_of_transport = self.route.tags['route']
             self.inventorise_members()
 
-        self.tags['type'] = 'route'
-        super().__init__(ml, members=self.members, attributes=attributes, tags=self.tags)
         self.continuous = None
 
     def inventorise_members(self):
         # split route relation members into stops and ways
-        for member in self.members:
+        self.stops = []
+        self.ways = []
+        for member in self.route.members:
             if member.primtype == 'node':
-                node = self.maplayer.nodes[member.memberid]
+                node = self.route.maplayer.nodes[member.memberid]  # type: Node
                 if (node.tags['highway'] == 'bus_stop' or
-                    node.tags['railway'] == 'tram_stop' or
-                    node.tags['public_transport'] in ['platform', 'stop_position']):
+                        node.tags['railway'] == 'tram_stop' or
+                        node.tags['public_transport'] in ['platform', 'stop_position']):
                     self.stops.append(node)
             if member.primtype == 'way':
-                way = self.maplayer.ways[member.memberid]
-
+                way = self.route.maplayer.ways[member.memberid]  # type: Way
                 if (way.tags['highway'] != 'platform' and
-                    way.tags['railway'] == 'platform'):
+                        way.tags['railway'] != 'platform'):
                     self.ways.append(way)
 
     def update_stops(self, new_stops_sequence):
-        if not(self.stops):
+        if not self.stops:
             self.inventorise_members()
         self.stops = new_stops_sequence
 
-        self.members = []
+        self.route.members = []  # type: List[Primitive]
         for stop in self.stops:
-            self.members.append(stop)
+            self.route.members.append(stop)
         for way in self.ways:
-            self.members.append(way)
-        self.modified = True
+            self.route.members.append(way)
+        self.route = True
 
-    def is_continuous(self):
+    @property
+    def is_continuous(self) -> [bool, None]:
         last_node_of_previous_way = None
-        for member in self.members:
+        for member in self.route.members:
             if member.primitive == 'way':
-                ''' Is this way present in the downloaded data?'''
-                if not (member.memberid in self.maplayer.ways):
+                """ Is this way present in the downloaded data?"""
+                if not (member.memberid in self.route.maplayer.ways):
                     self.continuous = None
                     return None
-                ''' First time in loop, just store last node of way as previous node'''
+                """ First time in loop, just store last node of way as previous node"""
                 if last_node_of_previous_way is None:
-                    last_node_of_previous_way = self.maplayer.ways[member.memberid][-1]
+                    last_node_of_previous_way = self.route.maplayer.ways[member.memberid][-1]
                     continue
                 else:
-                    if last_node_of_previous_way != self.maplayer.ways[member.memberid][0]:
+                    if last_node_of_previous_way != self.route.maplayer.ways[member.memberid][0]:
                         self.continuous = False
                         return False
         if last_node_of_previous_way:
-            '''If we get here, the route is continuous'''
+            """If we get here, the route is continuous"""
             self.continuous = True
         else:
             self.continuous = None
         return self.continuous
 
-class PublicTransportRouteMaster(Relation):
-    """This is what we think of as a public transport line
-       It contains route relations for each variation of an itinerary"""
 
-    def __init__(self, ml, members=None, tags=None, attributes=None):
+class Line:
+    """Collection of variations in itinerary.
+
+       In OpenStreetMap it is mapped as a route_master relation"""
+
+    def __init__(self, ml, route_master_relation=None, members=None, tags=None):
+        """ :type members: list[RelationMember]
+            :type ml: MapLayer
+        """
+        self.map_layer = ml
         if tags is None:
             self.tags = []
         else:
             self.tags = tags
-        self.tags['type'] = 'route_master'
-        super().__init__(ml, members=members, attributes=attributes, tags=self.tags)
+        if route_master_relation is None:
+            if tags is None:
+                tags = {'type': 'route_master'}
+            else:
+                tags = tags
 
-    def add_route(self, route):
-        super().add_member(RelationMember(primtype='relation', role='', member=route))
+            self.route_master = Relation(ml,
+                                         members=members,
+                                         tags=tags)
+        else:
+            self.route_master = route_master_relation
+
+    def add_route(self, route_relation):
+        self.route_master.add_member(RelationMember(self.map_layer,
+                                                    role='',
+                                                    primitive_type='relation',
+                                                    member=route_relation.route))
 
 
 class Edge:
     """An edge is a sequence of ways that are connected to one another, they can either be between where highways fork,
        or where PT routes fork. An edge can contain shorter edges"""
 
-    def __init__(self, ml, parts=None):
+    def __init__(self, parts=None):
         self.parts = []
         if parts:
-            self.parts = self.add_parts(parts)
+            self.add_parts(parts)
         # ml.edges[self.attributes['id']] = self
 
-    def add_parts(self, parts):
+    def add_parts(self, parts: Way):
         for p in parts:
             self.add_part(p)
 
-    def add_part(self, part):
+    def add_part(self, part: Way):
         self.parts.append(part)
 
     def get_ways(self):
@@ -511,7 +600,6 @@ class Edge:
         return ways
 
 
-'''
 ml = MapLayer()
 n1 = Node(ml)
 n2 = Node(ml)
@@ -522,15 +610,15 @@ n6 = Node(ml)
 n7 = Node(ml)
 n8 = Node(ml)
 
-w1 = Way(ml, nodes = [n1, n2])
-print(w1.to_xml())
-w2 = Way(ml, nodes = [n2, n3, n4])
-w3 = Way(ml, nodes = [n4, n5])
-w4 = Way(ml, nodes = [n5, n6])
-w5 = Way(ml, nodes = [n6, n7])
-w6 = Way(ml, nodes = [n7, n8])
-print(w6.to_xml())
-
+w1 = Way(ml, nodes=[n1, n2])
+print(ET.tostring(w1.xml, encoding='UTF-8'))
+w2 = Way(ml, nodes=[n2, n3, n4])
+w3 = Way(ml, nodes=[n4, n5])
+w4 = Way(ml, nodes=[n5, n6])
+w5 = Way(ml, nodes=[n6, n7])
+w6 = Way(ml, nodes=[n7, n8])
+print(ET.tostring(w6.xml, encoding='UTF-8'))
+'''
 e1 = Edge(ml, parts = [w1, w2])
 e2 = Edge(ml, parts = [w3])
 e3 = Edge(ml, parts = [w4, w5])
@@ -541,3 +629,5 @@ print(e2.get_ways())
 print(e3.get_ways())
 print(e4.get_ways())
 '''
+
+print(ET.tostring(ml.xml(), encoding='UTF-8'))
