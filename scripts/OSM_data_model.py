@@ -35,7 +35,7 @@ class MapLayer:
             raise ValueError('id should start with n, w or r')
 
     def from_overpy(self, osm_data):
-        for node in osm_datanodes:
+        for node in osm_data.nodes:
             node.attributes['id'] = node.id
             node.attributes['lon'] = node.lon
             node.attributes['lat'] = node.lat
