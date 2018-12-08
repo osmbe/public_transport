@@ -493,13 +493,13 @@ class Itinerary:
         self.ways = []
         for member in self.route.members:
             if member.primitive_type == 'node':
-                node = self.route.maplayer.nodes[member.memberid]  # type: Node
+                node = self.route.maplayer.primitives['nodes'][member.memberid]  # type: Node
                 if (node.tags['highway'] == 'bus_stop' or
                         node.tags['railway'] == 'tram_stop' or
                         node.tags['public_transport'] in ['platform', 'stop_position']):
                     self.stops.append(node)
             if member.primitive_type == 'way':
-                way = self.route.maplayer.ways[member.memberid]  # type: Way
+                way = self.route.maplayer.primitives['ways'][member.memberid]  # type: Way
                 if (way.tags['highway'] != 'platform' and
                         way.tags['railway'] != 'platform'):
                     self.ways.append(way)
@@ -522,15 +522,15 @@ class Itinerary:
         for member in self.route.members:
             if member.primitive == 'way':
                 """ Is this way present in the downloaded data?"""
-                if not (member.memberid in self.route.maplayer.ways):
+                if not (member.memberid in self.route.maplayer.primitives['ways']):
                     self.continuous = None
                     return None
                 """ First time in loop, just store last node of way as previous node"""
                 if last_node_of_previous_way is None:
-                    last_node_of_previous_way = self.route.maplayer.ways[member.memberid][-1]
+                    last_node_of_previous_way = self.route.maplayer.primitives['ways'][member.memberid][-1]
                     continue
                 else:
-                    if last_node_of_previous_way != self.route.maplayer.ways[member.memberid][0]:
+                    if last_node_of_previous_way != self.route.maplayer.primitives['ways'][member.memberid][0]:
                         self.continuous = False
                         return False
         if last_node_of_previous_way:
