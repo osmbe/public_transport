@@ -602,7 +602,7 @@ class Edge:
                         pass
         return ways
 
-
+'''
 ml = MapLayer()
 n1 = Node(ml)
 n2 = Node(ml)
@@ -621,7 +621,7 @@ w4 = Way(ml, nodes=[n5, n6])
 w5 = Way(ml, nodes=[n6, n7])
 w6 = Way(ml, nodes=[n7, n8])
 print(eT.tostring(w6.xml, encoding='UTF-8'))
-'''
+
 e1 = Edge(ml, parts = [w1, w2])
 e2 = Edge(ml, parts = [w3])
 e3 = Edge(ml, parts = [w4, w5])
@@ -631,6 +631,5 @@ print(e1.get_ways())
 print(e2.get_ways())
 print(e3.get_ways())
 print(e4.get_ways())
-'''
-
 print(eT.tostring(ml.xml(), encoding='UTF-8'))
+'''
