@@ -199,7 +199,7 @@ class Primitive:
     @property
     def xml(self):
         for attr in self.attributes:
-            if attr == 'timestamp'
+            if attr == 'timestamp':
                 self.attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
             else:
                 self.attributes[attr] = str(self.attributes[attr])
