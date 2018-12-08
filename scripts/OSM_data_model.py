@@ -384,7 +384,7 @@ class Relation(Primitive):
     def xml(self):
         rel = super().xml
         for member in self.members:
-            assert isinstance(member, str), "member is not a string: %r" % member
+            assert isinstance(member.xml, str), "member is not a string: %r" % member
             rel.extend([member.xml])
 
         return rel
