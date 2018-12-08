@@ -271,7 +271,7 @@ class Way(Primitive):
 
     @property
     def xml(self):
-        way = super().xml  # type: ET.Element
+        way = super().xml  # type: eT.Element
         for nd in self.nodes:
             way.extend([eT.Element('nd', attrib={'ref': nd}
                                    )
@@ -400,7 +400,6 @@ class Stop:
                 # node of a highway suitable for the mode of transport
                 pt_tag = "public_transport" in primitive.member.tags
                 hw_tag = "highway" in primitive.member.tags
-                rw_tag = "railway" in primitive.member.tags
                 if (pt_tag and primitive.member.tags['public_transport'] == 'platform' or
                         hw_tag and primitive.member.tags['highway'] == 'bus_stop'):
                     self.platform_node = primitive
@@ -494,14 +493,19 @@ class Itinerary:
         for member in self.route.members:
             if member.primitive_type == 'node':
                 node = self.route.maplayer.primitives['nodes'][member.id]  # type: Node
-                if (node.tags['highway'] == 'bus_stop' or
-                        node.tags['railway'] == 'tram_stop' or
-                        node.tags['public_transport'] in ['platform', 'stop_position']):
+                hw_tag = 'highway' in node.tags
+                rw_tag = 'railway' in node.tags
+                pt_tag = 'public_transport' in node.tags
+                if (hw_tag and node.tags['highway'] == 'bus_stop' or
+                        rw_tag and node.tags['railway'] == 'tram_stop' or
+                        pt_tag and node.tags['public_transport'] in ['platform', 'stop_position']):
                     self.stops.append(node)
             if member.primitive_type == 'way':
                 way = self.route.maplayer.primitives['ways'][member.id]  # type: Way
-                if (way.tags['highway'] != 'platform' and
-                        way.tags['railway'] != 'platform'):
+                hw_tag = 'highway' in way.tags
+                rw_tag = 'railway' in way.tags
+                if (hw_tag and way.tags['highway'] != 'platform' and
+                        rw_tag and way.tags['railway'] != 'platform'):
                     self.ways.append(way)
 
     def update_stops(self, new_stops_sequence):
