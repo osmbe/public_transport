@@ -419,10 +419,12 @@ class Stop:
                     hw_tag and primitive.tags['highway'] == 'bus_stop'):
                 self.platform_node = RelationMember(self.map_layer,
                                                     role='platform',
+                                                    primtype='node',
                                                     member=primitive)
             elif (pt_tag and primitive.tags['public_transport'] == 'stop_position'):
                 self.stop_position_node = RelationMember(self.map_layer,
                                                          role='stop',
+                                                         primtype = 'node',
                                                          member=primitive)
         elif isinstance(primitive, Way):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
@@ -430,6 +432,7 @@ class Stop:
                     rw_tag and primitive.tags['railway'] == 'platform'):
                 self.platform_way = RelationMember(self.map_layer,
                                                    role='platform',
+                                                   primtype='way',
                                                    member=primitive)
 
     @property
