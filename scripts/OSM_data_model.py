@@ -202,15 +202,16 @@ class Primitive:
         for attr in self.attributes:
             if attr == 'timestamp':
                 xml_attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
-            elif self.attributes[attr]:
+            elif self.attributes[attr] is not None:
                 xml_attributes[attr] = str(self.attributes[attr])
         _xml = eT.Element(self.primitive, attrib=xml_attributes)
         for key in self.tags:
-            _xml.extend([eT.Element('tag', attrib={'k': key,
-                                                   'v': str(self.tags[key])
-                                                   }
-                                    )
-                         ])
+            if str(self.tags[key]) is not None:
+                _xml.extend([eT.Element('tag', attrib={'k': key,
+                                                       'v': str(self.tags[key])
+                                                       }
+                                        )
+                             ])
         return _xml
 
     def get_parents(self):
