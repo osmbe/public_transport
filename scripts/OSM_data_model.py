@@ -323,7 +323,10 @@ class RelationMember(object):
         :type primitive_type: str
         :type member [Primitive, str, int]
         """
-        self.role = role
+        if role is None:
+            self.role = ""
+        else:
+            self.role = role
         self.member = None
 
         if isinstance(member, Primitive):
