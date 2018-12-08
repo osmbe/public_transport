@@ -86,7 +86,7 @@ class MapLayer:
         for primtype in ('nodes', 'ways', 'relations'):
             for prim_id in self.primitives[primtype]:
                 osm_xml_root.extend([self.primitives[primtype][prim_id].xml])
-        return osm_xml_root
+        return eT.ElementTree(element=osm_xml_root)
 
     def url(self, upload='false', generator='', new_layer=True, layer_name=''):
         """
