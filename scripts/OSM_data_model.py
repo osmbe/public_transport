@@ -1,6 +1,5 @@
 #!/bin/python3
 from typing import List
-from types import StringType
 from urllib.parse import urlencode
 import xml.etree.ElementTree as eT
 
@@ -79,10 +78,10 @@ class MapLayer:
         :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         """
-        assert type(upload) is StringType, "upload is not a string: %r" % upload
+        assert isinstance(upload, str), "upload is not a string: %r" % upload
         xml_attributes = {'version': '0.6', 'upload': upload}
 
-        assert type(generator) is StringType, "generator is not a string: %r" % generator
+        assert isinstance(generator, str), "generator is not a string: %r" % generator
         if generator:
             xml_attributes['generator'] = generator
         osm_xml_root = eT.Element('osm', attrib=xml_attributes)
@@ -204,14 +203,14 @@ class Primitive:
     def xml(self):
         xml_attributes = {}
         for attr in self.attributes:
-            assert type(attr) is StringType, "attr is not a string: %r" % attr
+            assert isinstance(attr, str), "attr is not a string: %r" % attr
             if attr == 'timestamp':
                 xml_attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
             elif self.attributes[attr] is not None:
                 xml_attributes[attr] = str(self.attributes[attr])
         _xml = eT.Element(self.primitive, attrib=xml_attributes)
         for key in self.tags:
-            assert type(key) is StringType, "key is not a string: %r" % key
+            assert isinstance(key, str), "key is not a string: %r" % key
             if str(self.tags[key]) is not None:
                 _xml.extend([eT.Element('tag', attrib={'k': key,
                                                        'v': str(self.tags[key])
@@ -284,7 +283,7 @@ class Way(Primitive):
     def xml(self):
         way = super().xml  # type: eT.Element
         for nd in self.nodes:
-            assert type(nd) is StringType, "nd is not a string: %r" % nd
+            assert isinstance(nd, str), "nd is not a string: %r" % nd
             if nd is not None:
                 way.extend([eT.Element('nd', attrib={'ref': str(nd)}
                                        )
@@ -346,9 +345,9 @@ class RelationMember(object):
 
     @property
     def xml(self):
-        assert type(self.primitive_type) is StringType, "self.primitive_type is not a string: %r" % self.primitive_type
-        assert type(self.id) is StringType, "self.id is not a string: %r" % self.id
-        assert type(self.role) is StringType, "self.role is not a string: %r" % self.role
+        assert isinstance(self.primitive_type, str), "self.primitive_type is not a string: %r" % self.primitive_type
+        assert isinstance(self.id, str), "self.id is not a string: %r" % self.id
+        assert isinstance(self.role, str), "self.role is not a string: %r" % self.role
         return eT.Element('member', attrib={'type': self.primitive_type,
                                             'ref': self.id,
                                             'role': self.role})
@@ -385,7 +384,7 @@ class Relation(Primitive):
     def xml(self):
         rel = super().xml
         for member in self.members:
-            assert type(member) is StringType, "member is not a string: %r" % member
+            assert isinstance(member, str), "member is not a string: %r" % member
             rel.extend([member.xml])
 
         return rel
