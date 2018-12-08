@@ -72,8 +72,8 @@ class MapLayer:
                 elif rel.tags['type'] == 'route_master':
                     Line(**kwargs)
                     continue
-
-            Relation(**kwargs)
+            else:
+                Relation(**kwargs)
 
     def xml(self, upload='false', generator=''):
         """
@@ -457,7 +457,7 @@ class Itinerary:
        In OpenStreetMap it is mapped as a route relation"""
 
     def __init__(self, ml, route_relation=None, mode_of_transport=None,
-                 stops=None, ways=None, tags=None):
+                 stops=None, ways=None, tags=None, attributes=None):
         """Either  there is a route relation, or one will be created based on the values in
            stops, ways and tags.
            :type ml: MapLayer
@@ -484,7 +484,8 @@ class Itinerary:
 
             self.route = Relation(ml,
                                   members=self.stops,  # TODO needs more work .extend([self.ways]),
-                                  tags=tags)
+                                  tags=tags,
+                                  attributes=attributes)
         else:
             self.route = route_relation
             self.mode_of_transport = self.route.tags['route']
@@ -551,7 +552,8 @@ class Line:
 
        In OpenStreetMap it is mapped as a route_master relation"""
 
-    def __init__(self, ml, route_master_relation=None, members=None, tags=None):
+    def __init__(self, ml, route_master_relation=None, members=None,
+                 tags=None, attributes=None):
         """ :type members: list[RelationMember]
             :type ml: MapLayer
         """
@@ -568,7 +570,8 @@ class Line:
 
             self.route_master = Relation(ml,
                                          members=members,
-                                         tags=tags)
+                                         tags=tags,
+                                         attributes=attributes)
         else:
             self.route_master = route_master_relation
 
