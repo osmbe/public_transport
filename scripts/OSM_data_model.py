@@ -36,7 +36,7 @@ class MapLayer:
 
     def from_overpy(self, osm_data):
         for node in osm_data.nodes:
-            node.attributes['id'] = node.id
+            node.attributes['id'] = str(node.id)
             node.attributes['lon'] = node.lon
             node.attributes['lat'] = node.lat
             Stop(map_layer=self, primitive=Node(map_layer=self,
@@ -44,7 +44,7 @@ class MapLayer:
                                                 tags=node.tags))
 
         for way in osm_data.ways:
-            way.attributes['id'] = way.id
+            way.attributes['id'] = str(way.id)
             Stop(map_layer=self, primitive=Way(map_layer=self,
                                                attributes=way.attributes,
                                                tags=way.tags,
@@ -57,7 +57,7 @@ class MapLayer:
                                               role=member.role,
                                               primitive_type=member._type_value)
                                )
-            rel.attributes['id'] = rel.id
+            rel.attributes['id'] = str(rel.id)
 
             rltn = Relation(map_layer=self,
                             attributes=rel.attributes,
