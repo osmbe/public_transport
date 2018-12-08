@@ -292,7 +292,7 @@ class RelationMember(object):
 
     def __new__(cls, *args, **kwargs):
         role = kwargs['role']
-        primitive_type = kwargs['primtype']
+        primitive_type = kwargs['primitive_type']
         member = kwargs['member']
         if isinstance(member, Primitive):
             member_id = member.id
@@ -419,12 +419,12 @@ class Stop:
                     hw_tag and primitive.tags['highway'] == 'bus_stop'):
                 self.platform_node = RelationMember(self.map_layer,
                                                     role='platform',
-                                                    primtype='node',
+                                                    primitive_type='node',
                                                     member=primitive)
             elif (pt_tag and primitive.tags['public_transport'] == 'stop_position'):
                 self.stop_position_node = RelationMember(self.map_layer,
                                                          role='stop',
-                                                         primtype = 'node',
+                                                         primitive_type='node',
                                                          member=primitive)
         elif isinstance(primitive, Way):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
@@ -432,7 +432,7 @@ class Stop:
                     rw_tag and primitive.tags['railway'] == 'platform'):
                 self.platform_way = RelationMember(self.map_layer,
                                                    role='platform',
-                                                   primtype='way',
+                                                   primitive_type='way',
                                                    member=primitive)
 
     @property
@@ -495,13 +495,13 @@ class Itinerary:
         self.stops = []
         self.ways = []
         for member in self.route.members:
-            if member.primtype == 'node':
+            if member.primitive_type == 'node':
                 node = self.route.maplayer.nodes[member.memberid]  # type: Node
                 if (node.tags['highway'] == 'bus_stop' or
                         node.tags['railway'] == 'tram_stop' or
                         node.tags['public_transport'] in ['platform', 'stop_position']):
                     self.stops.append(node)
-            if member.primtype == 'way':
+            if member.primitive_type == 'way':
                 way = self.route.maplayer.ways[member.memberid]  # type: Way
                 if (way.tags['highway'] != 'platform' and
                         way.tags['railway'] != 'platform'):
