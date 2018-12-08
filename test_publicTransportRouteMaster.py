@@ -12,4 +12,4 @@ class TestPublicTransportRouteMaster(TestCase):
                                      type='relation')
         rm = osm.PublicTransportRouteMaster(ml,
                                             members=[member1, member2])
-        print (rm.to_xml)
+        print (rm.xml)
