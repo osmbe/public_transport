@@ -198,8 +198,11 @@ class Primitive:
 
     @property
     def xml(self):
-        if 'timestamp' in self.attributes:
-            self.attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
+        for attr in self.attributes:
+            if attr == 'timestamp'
+                self.attributes['timestamp'] = str(self.attributes['timestamp']).replace(' ', 'T').replace('Z', '') + 'Z'
+            else:
+                self.attributes[attr] = str(self.attributes[attr])
         _xml = eT.Element(self.primitive, attrib=self.attributes)
         for key in self.tags:
             _xml.extend([eT.Element('tag', attrib={'k': key,
