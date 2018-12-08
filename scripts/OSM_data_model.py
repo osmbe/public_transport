@@ -203,7 +203,7 @@ class Primitive:
         _xml = eT.Element(self.primitive, attrib=self.attributes)
         for key in self.tags:
             _xml.extend([eT.Element('tag', attrib={'k': key,
-                                                   'v': self.tags[key]
+                                                   'v': str(self.tags[key])
                                                    }
                                     )
                          ])
