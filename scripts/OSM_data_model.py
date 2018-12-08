@@ -396,32 +396,38 @@ class Stop:
             It analyses them and assigns them to the proper attribute
             as a RelationMember
             :type primitive: Primitive"""
+        pt_tag = "public_transport" in primitive.tags
+        hw_tag = "highway" in primitive.tags
+        rw_tag = 'railway' in primitive.tags
         if isinstance(primitive, RelationMember):
             if isinstance(primitive.member, Node):
                 # It would be better to look at whether this node is a way
                 # node of a highway suitable for the mode of transport
-                if (primitive.member.tags['public_transport'] == 'platform' or
-                        primitive.member.tags['highway'] == 'bus_stop'):
+                pt_tag = "public_transport" in primitive.member.tags
+                hw_tag = "highway" in primitive.member.tags
+                rw_tag = "railway" in primitive.member.tags
+                if (pt_tag and primitive.member.tags['public_transport'] == 'platform' or
+                        hw_tag and primitive.member.tags['highway'] == 'bus_stop'):
                     self.platform_node = primitive
-                elif primitive.member.tags['public_transport'] == 'stop_position':
+                elif (pt_tag and primitive.member.tags['public_transport'] == 'stop_position'):
                     self.stop_position_node = primitive
             if isinstance(primitive.member, Way):
-                if primitive.member.tags['public_transport'] == 'platform':
+                if (pt_tag and primitive.member.tags['public_transport'] == 'platform'):
                     self.platform_way = primitive
         elif isinstance(primitive, Node):
-            if (primitive.tags['public_transport'] == 'platform' or
-                    primitive.tags['highway'] == 'bus_stop'):
+            if (pt_tag and primitive.tags['public_transport'] == 'platform' or
+                    hw_tag and primitive.tags['highway'] == 'bus_stop'):
                 self.platform_node = RelationMember(self.map_layer,
                                                     role='platform',
                                                     member=primitive)
-            elif primitive.tags['public_transport'] == 'stop_position':
+            elif (pt_tag and primitive.tags['public_transport'] == 'stop_position'):
                 self.stop_position_node = RelationMember(self.map_layer,
                                                          role='stop',
                                                          member=primitive)
         elif isinstance(primitive, Way):
-            if (primitive.tags['public_transport'] == 'platform' or
-                    primitive.tags['highway'] == 'platform' or
-                    primitive.tags['railway'] == 'platform'):
+            if (pt_tag and primitive.tags['public_transport'] == 'platform' or
+                    hw_tag and primitive.tags['highway'] == 'platform' or
+                    rw_tag and primitive.tags['railway'] == 'platform'):
                 self.platform_way = RelationMember(self.map_layer,
                                                    role='platform',
                                                    member=primitive)
@@ -472,7 +478,7 @@ class Itinerary:
                 tags = tags
 
             self.route = Relation(ml,
-                                  members=self.stops, # TODO needs more work .extend([self.ways]),
+                                  members=self.stops,  # TODO needs more work .extend([self.ways]),
                                   tags=tags)
         else:
             self.route = route_relation
