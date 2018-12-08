@@ -308,7 +308,12 @@ class RelationMember(object):
             cls._instances[key] = instance
             return instance
 
-    def __init__(self, ml, role="", primitive_type="", member=None):
+    def __init__(self, role="", primitive_type="", member=None):
+        """
+        :type role: str
+        :type primitive_type: str
+        :type member [Primitive, str, int]
+        """
         self.role = role
         self.primitive_type = primitive_type
         self.member = None
