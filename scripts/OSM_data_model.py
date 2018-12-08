@@ -78,10 +78,10 @@ class MapLayer:
         :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         """
-
-        osm_xml_root = eT.Element('osm', attrib={'version': '0.6',
-                                                 'upload': upload,
-                                                 'generator': generator})
+        xml_attributes = {'version': '0.6', 'upload': upload}
+        if generator:
+            xml_attributes['generator'] = generator
+        osm_xml_root = eT.Element('osm', attrib=xml_attributes)
 
         for primtype in ('nodes', 'ways', 'relations'):
             for prim_id in self.primitives[primtype]:
@@ -111,22 +111,22 @@ class MapLayer:
         return "http://localhost:8111/load_data?" + urlencode(values)
 
     def http_link(self, upload='false', generator='',
-                  new_layer=True, layer_name='', linktext=''):
+                  new_layer=True, layer_name='', link_text=''):
         """
         :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         :type new_layer: bool set to False to add data to currently open layer in JOSM
         :type layer_name: string name for the layer to be created if new_layer=True
-        :type linktext: string text to show on the link
+        :type link_text: string text to show on the link
         """
-        params = {'linktext': linktext,
+        params = {'link_text': link_text,
                   'url': self.url(upload=upload,
                                   generator=generator,
                                   new_layer=new_layer,
                                   layer_name=layer_name)
                   }
         print(params)
-        return '<a href="{url}">{linktext}</a>'.format(**params)
+        return '<a href="{url}">{link_text}</a>'.format(**params)
 
 
 class Primitive:
@@ -278,7 +278,8 @@ class Way(Primitive):
     def xml(self):
         way = super().xml  # type: eT.Element
         for nd in self.nodes:
-            way.extend([eT.Element('nd', attrib={'ref': nd}
+            if nd is not None:
+                way.extend([eT.Element('nd', attrib={'ref': nd}
                                    )
                         ])
         return way
@@ -474,7 +475,7 @@ class Itinerary:
             tags = extratags
 
         if mode_of_transport:
-            self. mode_of_transport = mode_of_transport
+            self.mode_of_transport = mode_of_transport
 
         if route_relation is None:
             tags['type'] = 'route'
@@ -606,6 +607,7 @@ class Edge:
                     except:
                         pass
         return ways
+
 
 '''
 ml = MapLayer()
