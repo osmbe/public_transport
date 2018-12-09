@@ -3,6 +3,37 @@ from typing import List
 from urllib.parse import urlencode
 import xml.etree.ElementTree as eT
 
+suitable_for = {'bus': {'highway': ['motorway',
+                                    'trunk',
+                                    'primary',
+                                    'secondary',
+                                    'tertiary',
+                                    'unclassified',
+                                    'residential',
+                                    'service',
+                                    ],
+                        'bus': ['yes', 'designated'],
+                        'psv': ['yes', 'designated'],
+                        },
+                'coach': {'highway': ['motorway',
+                                    'trunk',
+                                    'primary',
+                                    'secondary',
+                                    'tertiary',
+                                    'unclassified',
+                                    'residential',
+                                    'service',
+                                    ],
+                        },
+                'trolleybus': {'trolley_wire': 'yes'
+                               },
+                'tram': {'railway': ['tram'],
+                         },
+                'subway': {'railway': ['subway'],
+                         },
+                'train': {'railway': ['rail']
+                         },
+                }
 
 class MapLayer:
     def __init__(self):
@@ -302,9 +333,22 @@ class RelationMember(object):
     _instances = {}
 
     def __new__(cls, *args, **kwargs):
-        role = kwargs['role']
-        primitive_type = kwargs['primitive_type']
         member = kwargs['member']
+        if 'primitive_type' in kwargs:
+            primitive_type = kwargs['primitive_type']
+        else:
+            if isinstance(member, Node):
+                primitive_type = 'node'
+            elif isinstance(member, Way):
+                primitive_type = 'way'
+            elif isinstance(member, Relation):
+                primitive_type = 'relation'
+            else:
+                raise ValueError("primitive's type can't be determined")
+        if 'role' in kwargs:
+            role = kwargs['role']
+        else:
+            role = ''
         if isinstance(member, Primitive):
             member_id = member.id
         elif isinstance(member, str):
@@ -476,11 +520,11 @@ class Itinerary:
        In OpenStreetMap it is mapped as a route relation"""
 
     def __init__(self, map_layer, route_relation=None, mode_of_transport=None,
-                 stops=None, ways=None, extratags=None):
+                 stops=None, ways=None, extra_tags=None):
         """Either  there is a route relation, or one will be created based on the values in
            stops, ways and tags.
            :type map_layer: MapLayer
-           :type stops: List[RelationMember]
+           :type stops: List[Stop]
            :type ways:  List[Way]"""
         self.map_layer = map_layer
         if stops is None:
@@ -493,21 +537,29 @@ class Itinerary:
         else:
             self.ways = ways
 
-        if extratags is None:
+        if extra_tags is None:
             tags = {}
         else:
-            tags = extratags
+            tags = extra_tags
 
         if mode_of_transport:
             self.mode_of_transport = mode_of_transport
+        else:
+            self.mode_of_transport = ''
 
         if route_relation is None:
             tags['type'] = 'route'
-            tags['route'] = self.mode_of_transport
+            if self.mode_of_transport:
+                tags['route'] = self.mode_of_transport
             tags['public_transport:version'] = '2'
 
+            members = []
+            for stop in self.stops:
+                members.extend(stop.get_stop_objects)
+            for way in self.ways:
+                members.append(RelationMember(way))
             self.route = Relation(map_layer,
-                                  members=self.stops + self.ways,
+                                  members=members,
                                   tags=tags)
         else:
             self.route = route_relation
@@ -529,25 +581,39 @@ class Itinerary:
                 if (hw_tag and node.tags['highway'] == 'bus_stop' or
                         rw_tag and node.tags['railway'] == 'tram_stop' or
                         pt_tag and node.tags['public_transport'] in ['platform', 'stop_position']):
-                    self.stops.append(node)
+                    self.stops.append(member)
             if member.primitive_type == 'way':
                 way = self.route.maplayer.primitives['ways'][member.id]  # type: Way
                 hw_tag = 'highway' in way.tags
                 rw_tag = 'railway' in way.tags
                 if (hw_tag and way.tags['highway'] != 'platform' and
                         rw_tag and way.tags['railway'] != 'platform'):
-                    self.ways.append(way)
+                    self.ways.append(member)
 
     def update_stops(self, new_stops_sequence):
+        """
+
+        :type new_stops_sequence: list[str]
+        """
         if not self.stops:
             self.inventorise_members()
-        self.stops = new_stops_sequence
+        self.stops = []
+        stop = None
+        for stop_id in new_stops_sequence:
+            if isinstance(stop_id, str):
+                if stop_id in self.map_layer.primitives['nodes']:
+                    stop = self.map_layer.primitives['nodes'][stop_id]
+            elif isinstance(stop_id, Primitive):
+                stop = stop_id
+            else:
+                stop = Node(map_layer=self.map_layer, tags={'highway': 'bus_stop'})
+            self.stops.append(Stop(self.map_layer, stop))
 
-        self.route.members = []  # type: List[Primitive]
+        self.route.members = []  # type: List[RelationMember]
         for stop in self.stops:
-            self.route(stop)
+            self.route.members.extend(stop.get_stop_objects)
         for way in self.ways:
-            self.route.members.append(way)
+            self.route.members.append(RelationMember(member=way))
 
     @property
     def is_continuous(self) -> [bool, None]:
@@ -651,7 +717,7 @@ if __name__ == '__main__':
     w5 = Way(ml, nodes=[n6, n7])
     w6 = Way(ml, nodes=[n7, n8])
     print(eT.tostring(w6.xml, encoding='UTF-8'))
-
+    """
     e1 = Edge(ml, parts=[w1, w2])
     e2 = Edge(ml, parts=[w3])
     e3 = Edge(ml, parts=[w4, w5])
@@ -662,5 +728,30 @@ if __name__ == '__main__':
     print(e3.get_ways())
     print(e4.get_ways())
     print(eT.tostring(ml.xml(), encoding='UTF-8'))
+    """
 
     rm1 = RelationMember(role="", member=w1)
+
+    platform_node1 = Node(ml,tags={'name': 'First halt',
+                                   'ref': '123',
+                                   'highway': 'bus_stop'
+                                   }
+                          )
+    platform_node2 = Node(ml,tags={'name': 'Second halt',
+                                   'ref': '125',
+                                   'highway': 'bus_stop'
+                                   }
+                          )
+    platform_node3 = Node(ml,tags={'name': 'Third halt',
+                                   'ref': '127',
+                                   'highway': 'bus_stop'
+                                   }
+                          )
+
+    stop1 = Stop(ml, platform_node1)
+    stop2 = Stop(ml, platform_node2)
+    stop3 = Stop(ml, platform_node3)
+
+    itn1 = Itinerary(ml, stops=[stop1, stop2, stop3])
+
+    itn1.update_stops([stop3.platform_node, stop2.platform_node])
