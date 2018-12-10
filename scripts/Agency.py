@@ -10,10 +10,11 @@ import pandas as pd
 import shutil
 import requests
 
-from scripts.OSM_data_model import Stop, RelationMember
+from scripts.OSM_data_model import Stop, RelationMember, MapLayer
 
 
 class Agency:
+    map_layer = ...  # type: MapLayer
     agency_data = {}  # type: Dict[str, pd.DataFrame]
     sheet_filename = 'temp.xlsx'
 
@@ -28,12 +29,11 @@ class Agency:
         self.route_ref_tag = route_ref_tag
         self.zone_tag = zone_tag
 
-        self.map_layer = None
+        self.map_layer = osm.MapLayer()
 
     def perform_overpass_query(self, overpass_query):
         api = overpy.Overpass()
         if overpass_query:
-            self.map_layer = osm.MapLayer()
             self.map_layer.from_overpy(api.query(overpass_query))
             self.populate_from_osm_data()
 
@@ -66,9 +66,10 @@ class Agency:
                 self.itineraries.setdefault(itinerary.route.tags[self.ref_tag], []).append(itinerary)
         for line_id in osm.Line.lookup:
             line = osm.Line.lookup[line_id]
-            print(line)
-            if self.ref_tag in line.route_master.tags:
-                self.lines[line.route_master.tags[self.ref_tag]] = line
+            print(line_id, line.route_master)
+            tags = line.route_master.tags
+            if self.ref_tag in tags:
+                self.lines[tags[self.ref_tag]] = line
 
     def fetch_agency_data(self, sheet_url):
         with open(self.sheet_filename, 'wb') as out_file:
@@ -96,6 +97,7 @@ class Agency:
             except:
                 self.stops[stop].tags['created_by'] = "This stop doesn't seem to exist anymore"
                 continue
+            """
             # Compare name tag
             if self.stops[stop].tags['name'] != operator_stop.stopdescription:
                 # print('stop name not equal')
@@ -105,11 +107,12 @@ class Agency:
             if self.stops[stop].tags[self.route_ref_tag] != operator_stop.route_ref_calculated:
                 # print('route_ref not equal')
                 self.stops[stop].tags[self.route_ref_tag] = operator_stop.route_ref_calculated
+            """
 
         for line in self.lines:
-            for route_member in self.lines[line].members:
-                if not (self.ref_tag in self.map_layer.relations[int(route_member.id)].tags):
-                    self.map_layer.relations[int(route_member.id)].add_tag(self.ref_tag, line)
+            for route_member in self.lines[line].route_master.members:
+                if not (self.ref_tag in self.map_layer.primitives['relations'][route_member.id].tags):
+                    self.map_layer.primitives['relations'][route_member.id].add_tag(self.ref_tag, line)
             try:
                 operator_line = self.agency_data['lines'].loc[line]
             except:
@@ -137,27 +140,27 @@ class Agency:
                 itineraries_signatures[signature[0]] = True
 
             route_signatures = {}
-            for pt_route in self.itineraries[itinerary]:
+            for itin in self.itineraries[itinerary]:
+                print(itin)
                 stopslist = []
-                for member in pt_route.members:
-                    # testing for a node may not be the best idea,
-                    # it will only work consistently in Belgium
-                    if member.primtype == 'node':
-                        memberid = int(member.memberid)
-                        try:
-                            nd = self.map_layer.nodes[memberid]
-                        except:
+                for stop in itin.stops:
+                    print(stop.platform_node)
+                    for stop_prim in stop.get_stop_objects:
+                        print(stop_prim)
+                        if stop_prim.id in self.map_layer.primitives['nodes']:
+                            nd = self.map_layer.primitives['nodes'][member.memberid]
+                        else:
                             # not sure what to do if referred node is not in downloaded data
                             # The Overpass query should have downloaded all child objects
-                            print(memberid, ' was not found in downloaded data')
+                            print(member.memberid, ' was not found in downloaded data')
                             continue
                         stopslist.append(nd.tags[self.ref_tag])
-                route_signatures[pt_route.id] = ",".join(stopslist)
+                route_signatures[itin.route.id] = ",".join(stopslist)
 
-                if route_signatures[pt_route.id] in itineraries_signatures:
+                if route_signatures[itin.route.id] in itineraries_signatures:
                     # exact match, just remove this sequence from operator's signatures.
                     # print (route_signatures[pt_route.id], 'matches exactly.')
-                    del itineraries_signatures[route_signatures[pt_route.id]]
+                    del itineraries_signatures[route_signatures[itin.route.id]]
                 else:
                     pass  # print ('no match yet for', route_signatures[pt_route.id])
             for rtsig in route_signatures:

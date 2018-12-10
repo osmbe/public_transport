@@ -209,7 +209,6 @@ class Primitive:
     def modified(self, modified_flag):
         if modified_flag:
             self.attributes['action'] = 'modify'
-            self.maplayer.modified_primitives.append(self)
 
     def add_tags(self, tags, mark_modified=True):
         """
@@ -477,7 +476,7 @@ class Stop:
                         hw_tag and primitive.member.tags['highway'] == 'bus_stop' or
                         rw_tag and primitive.member.tags['railway'] == 'tram_stop'):
                     self.platform_node = primitive
-                    self.lookup[primitive.id] = self
+                    self.lookup[primitive.member.id] = self
                 elif (pt_tag and primitive.member.tags['public_transport'] == 'stop_position'):
                     self.stop_position_node = primitive
                     self.lookup[primitive.member.id] = self
@@ -650,17 +649,20 @@ class Itinerary:
             """If we get here, the route is continuous"""
             return True
 
+
 class Line:
     """Collection of variations in itinerary.
 
        In OpenStreetMap it is mapped as a route_master relation"""
     lookup = {}  # type: Dict[str, Line]
+
     def __init__(self, map_layer, route_master_relation=None, extratags=None):
         """:type map_layer: MapLayer
         """
         self.map_layer = map_layer
+        self.route_master = route_master_relation
 
-        if route_master_relation is None:
+        if self.route_master is None:
             if extratags is None:
                 tags = {'type': 'route_master'}
             else:
@@ -668,10 +670,8 @@ class Line:
 
             self.route_master = Relation(map_layer,
                                          tags=tags)
-        else:
-            self.route_master = route_master_relation
 
-        self.lookup[self.route_master.id] = Line
+        self.lookup[self.route_master.id] = self
 
     def add_route(self, route_relation):
         self.route_master.add_member(RelationMember(role='',
