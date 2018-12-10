@@ -1,5 +1,5 @@
 #!/bin/python3
-from typing import List
+from typing import List, Dict, Any
 from urllib.parse import urlencode
 import xml.etree.ElementTree as eT
 
@@ -36,13 +36,12 @@ suitable_for = {'bus': {'highway': ['motorway',
                 }
 
 class MapLayer:
+    primitives = {'nodes': {},
+                   'ways': {},
+                   'relations': {}
+                   }
     def __init__(self):
-        self.primitives = {'nodes': {},
-                           'ways': {},
-                           'relations': {}
-                           }
         self.edges = {}
-        self.modified_primitives = []
 
     def get_primitive(self, primitive):
         prim = primitive[0]  # type: str
@@ -444,6 +443,7 @@ class Relation(Primitive):
 class Stop:
     """Stops can consist of just a platform node, or a stop_position,
        or a stop_position combined with a platform node or way."""
+    lookup = {}  # type: Dict[str, Stop]
 
     def __init__(self, map_layer, primitive=None):
         """
@@ -477,21 +477,26 @@ class Stop:
                         hw_tag and primitive.member.tags['highway'] == 'bus_stop' or
                         rw_tag and primitive.member.tags['railway'] == 'tram_stop'):
                     self.platform_node = primitive
+                    self.lookup[primitive.id] = self
                 elif (pt_tag and primitive.member.tags['public_transport'] == 'stop_position'):
                     self.stop_position_node = primitive
+                    self.lookup[primitive.member.id] = self
             if isinstance(primitive.member, Way):
                 if pt_tag and primitive.member.tags['public_transport'] == 'platform':
                     self.platform_way = primitive
+                    self.lookup[primitive.member.id] = self
         elif isinstance(primitive, Node):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
                     hw_tag and primitive.tags['highway'] == 'bus_stop'):
                 self.platform_node = RelationMember(role='platform',
                                                     primitive_type='node',
                                                     member=primitive)
+                self.lookup[primitive.id] = self
             elif pt_tag and primitive.tags['public_transport'] == 'stop_position':
                 self.stop_position_node = RelationMember(role='stop',
                                                          primitive_type='node',
                                                          member=primitive)
+                self.lookup[primitive.id] = self
         elif isinstance(primitive, Way):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
                     hw_tag and primitive.tags['highway'] == 'platform' or
@@ -499,6 +504,7 @@ class Stop:
                 self.platform_way = RelationMember(role='platform',
                                                    primitive_type='way',
                                                    member=primitive)
+                self.lookup[primitive.id] = self
 
     @property
     def get_stop_objects(self):
@@ -518,7 +524,7 @@ class Itinerary:
     """An ordered sequence of stops along an itinerary.
 
        In OpenStreetMap it is mapped as a route relation"""
-
+    lookup = {}  # type: Dict[str, Itinerary]
     def __init__(self, map_layer, route_relation=None, mode_of_transport=None,
                  stops=None, ways=None, extra_tags=None):
         """Either  there is a route relation, or one will be created based on the values in
@@ -527,6 +533,7 @@ class Itinerary:
            :type stops: List[Stop]
            :type ways:  List[Way]"""
         self.map_layer = map_layer
+        self.others = []
         if stops is None:
             self.stops = []
         else:
@@ -566,12 +573,13 @@ class Itinerary:
             self.mode_of_transport = self.route.tags['route']
             self.inventorise_members()
 
-        self.continuous = None
+        self.lookup[self.route.id] = self
 
     def inventorise_members(self):
-        # split route relation members into stops and ways
+        # split route relation members into stops, ways and other objects
         self.stops = []
         self.ways = []
+        self.others = []
         for member in self.route.members:
             if member.primitive_type == 'node':
                 node = self.route.maplayer.primitives['nodes'][member.id]  # type: Node
@@ -582,13 +590,19 @@ class Itinerary:
                         rw_tag and node.tags['railway'] == 'tram_stop' or
                         pt_tag and node.tags['public_transport'] in ['platform', 'stop_position']):
                     self.stops.append(member)
-            if member.primitive_type == 'way':
+                else:
+                    self.others.append(member)
+            elif member.primitive_type == 'way':
                 way = self.route.maplayer.primitives['ways'][member.id]  # type: Way
                 hw_tag = 'highway' in way.tags
                 rw_tag = 'railway' in way.tags
                 if (hw_tag and way.tags['highway'] != 'platform' and
                         rw_tag and way.tags['railway'] != 'platform'):
                     self.ways.append(member)
+                else:
+                    self.others.append(member)
+            else:
+                self.others.append(member)
 
     def update_stops(self, new_stops_sequence):
         """
@@ -614,15 +628,16 @@ class Itinerary:
             self.route.members.extend(stop.get_stop_objects)
         for way in self.ways:
             self.route.members.append(RelationMember(member=way))
+        for other in self.others:
+            self.route.members.append(RelationMember(member=other))
 
     @property
     def is_continuous(self) -> [bool, None]:
         last_node_of_previous_way = None
         for member in self.route.members:
-            if member.primitive == 'way':
+            if member.primitive_type == 'way':
                 """ Is this way present in the downloaded data?"""
                 if not (member.id in self.route.maplayer.primitives['ways']):
-                    self.continuous = None
                     return None
                 """ First time in loop, just store last node of way as previous node"""
                 if last_node_of_previous_way is None:
@@ -630,21 +645,16 @@ class Itinerary:
                     continue
                 else:
                     if last_node_of_previous_way != self.route.maplayer.primitives['ways'][member.id][0]:
-                        self.continuous = False
                         return False
         if last_node_of_previous_way:
             """If we get here, the route is continuous"""
-            self.continuous = True
-        else:
-            self.continuous = None
-        return self.continuous
-
+            return True
 
 class Line:
     """Collection of variations in itinerary.
 
        In OpenStreetMap it is mapped as a route_master relation"""
-
+    lookup = {}  # type: Dict[str, Line]
     def __init__(self, map_layer, route_master_relation=None, extratags=None):
         """:type map_layer: MapLayer
         """
@@ -660,6 +670,8 @@ class Line:
                                          tags=tags)
         else:
             self.route_master = route_master_relation
+
+        self.lookup[self.route_master.id] = Line
 
     def add_route(self, route_relation):
         self.route_master.add_member(RelationMember(role='',
@@ -732,10 +744,15 @@ if __name__ == '__main__':
 
     rm1 = RelationMember(role="", member=w1)
 
-    platform_node1 = Node(ml,tags={'name': 'First halt',
-                                   'ref': '123',
-                                   'highway': 'bus_stop'
-                                   }
+    platform_node1 = Node(ml, tags={'name': 'First halt',
+                                    'ref': '123',
+                                    'highway': 'bus_stop',
+                                    }
+                          )
+    stop_position_node1 = Node(ml, tags={'name': 'First halt',
+                                    'public_transport': 'stop_position',
+                                    'bus': 'yes',
+                                    }
                           )
     platform_node2 = Node(ml,tags={'name': 'Second halt',
                                    'ref': '125',
@@ -749,9 +766,12 @@ if __name__ == '__main__':
                           )
 
     stop1 = Stop(ml, platform_node1)
+    stop1a = Stop(ml, stop_position_node1)
     stop2 = Stop(ml, platform_node2)
     stop3 = Stop(ml, platform_node3)
 
-    itn1 = Itinerary(ml, stops=[stop1, stop2, stop3])
+    itn1 = Itinerary(ml, stops=[stop1, stop2, stop3], extra_tags={'ref:De_Lijn': '3303'}, mode_of_transport='bus')
 
     itn1.update_stops([stop3.platform_node, stop2.platform_node])
+    print(stop1)
+    print(stop1a)
