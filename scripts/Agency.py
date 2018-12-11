@@ -61,7 +61,7 @@ class Agency:
                     self.stops[stop_object.tags[self.ref_tag]] = stop
         for itinerary_id in osm.Itinerary.lookup:
             itinerary = osm.Itinerary.lookup[itinerary_id]
-            print(itinerary)
+            print('Adding ' + str(itinerary) + ' to self.itineraries')
             if self.ref_tag in itinerary.route.tags:
                 self.itineraries.setdefault(itinerary.route.tags[self.ref_tag], []).append(itinerary)
         for line_id in osm.Line.lookup:
@@ -126,13 +126,18 @@ class Agency:
                 print('line name equal')
 
         for itinerary in self.itineraries:
+            #print("itinerary:", itinerary)
             itineraries_signatures = {}
+            # find its counterpart in the operator data
             try:
                 signatures = self.agency_data['itineraries'].loc[int(itinerary)].values
             except:
                 continue
+            #print(signatures)
             for signature in signatures:
+                #print(signature)
                 for key in list(itineraries_signatures.keys()):
+                    #print(key)
                     if signature[0] in key:
                         continue
                     elif key in signature[0]:
@@ -141,51 +146,53 @@ class Agency:
 
             route_signatures = {}
             for itin in self.itineraries[itinerary]:
-                print(itin)
+                #print('itin:', itin)
                 stopslist = []
                 for stop in itin.stops:
-                    print(stop.platform_node)
-                    for stop_prim in stop.get_stop_objects:
-                        print(stop_prim)
-                        if stop_prim.id in self.map_layer.primitives['nodes']:
-                            nd = self.map_layer.primitives['nodes'][member.memberid]
+                    for stop_member in stop.get_stop_objects:
+                        if stop_member.id in self.map_layer.primitives['nodes']:
+                            nd = self.map_layer.primitives['nodes'][stop_member.id]
                         else:
                             # not sure what to do if referred node is not in downloaded data
                             # The Overpass query should have downloaded all child objects
-                            print(member.memberid, ' was not found in downloaded data')
+                            print(stop_member.id, ' was not found in downloaded data')
                             continue
                         stopslist.append(nd.tags[self.ref_tag])
                 route_signatures[itin.route.id] = ",".join(stopslist)
 
                 if route_signatures[itin.route.id] in itineraries_signatures:
                     # exact match, just remove this sequence from operator's signatures.
-                    # print (route_signatures[pt_route.id], 'matches exactly.')
+                    print (route_signatures[itin.route.id], 'stops lists match exactly.')
+                    route_signatures[itin.route.id] = None
                     del itineraries_signatures[route_signatures[itin.route.id]]
                 else:
                     pass  # print ('no match yet for', route_signatures[pt_route.id])
-            for rtsig in route_signatures:
-                # The exact matches are already resolved, so now we need to try
-                # and find which stops sequences from agency are closest.
-                print(route_signatures[rtsig], 'does not match exactly')
-                highest_score = 0.0
-                best_match = ''
-                for itsig in itineraries_signatures:
-                    cur = SequenceMatcher(None, route_signatures[rtsig], itsig).ratio()
-                    if cur > highest_score:
-                        best_match = itsig
-                        highest_score = cur
-                if highest_score > 0.0:
-                    # the stop members of   pt_route[rtsig]   need to be updated
-                    print(len(itineraries_signatures))
-                    stops_sequence = []
-                    for stop in best_match.split(','):
-                        stops_sequence.append(self.stops[stop].id)
-                    self.itineraries[itinerary][rtsig].update_stops(stops_sequence)
-                    del itineraries_signatures[best_match]
+                for rtsig in route_signatures:
+                    # The exact matches are already resolved, so now we need to try
+                    # and find which stops sequences from agency are closest.
+                    if route_signatures[rtsig] is None:
+                        continue
+                    highest_score = 0.0
+                    best_match = ''
+                    for itsig in itineraries_signatures:
+                        cur = SequenceMatcher(None, route_signatures[rtsig], itsig).ratio()
+                        if cur > highest_score:
+                            best_match = itsig
+                            highest_score = cur
+                    if highest_score > 0.0:
+                        # the stop members of   pt_route[rtsig]   need to be updated
+                        print(len(itineraries_signatures))
+                        print('route signature with best match:', rtsig)
 
-            for itsig in itineraries_signatures:
-                # For all the remaining ones new route relations need to be created
-                print('todo:', itsig)
+                        # need to find the itinerary with route relation id rtsig
+                        itin.update_stops(best_match)
+                        # Make sure this one isn't considered for comparison anymore
+                        route_signatures[rtsig] = None
+                        del itineraries_signatures[best_match]
+
+        for itsig in itineraries_signatures:
+            # For all the remaining ones new route relations need to be created
+            print('todo:', itsig)
 
     def send_to_josm(self, new_layer=True, layer_name = 'Data from operator'):
         url = "http://127.0.0.1:8111/"

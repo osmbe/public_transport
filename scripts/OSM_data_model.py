@@ -203,7 +203,10 @@ class Primitive:
 
     @property
     def modified(self):
-        return self.attributes['action'] == 'modify'
+        if 'action' in self.attributes:
+            return self.attributes['action'] == 'modify'
+        else:
+            return False
 
     @modified.setter
     def modified(self, modified_flag):
@@ -428,6 +431,7 @@ class Relation(Primitive):
         self.members.append(member)
         if mark_modified:
             self.modified = True
+            print(self.attributes['action'])
 
     @property
     def xml(self):
@@ -574,6 +578,19 @@ class Itinerary:
 
         self.lookup[self.route.id] = self
 
+    def __repr__(self):
+        return "<{0}.{1}(mode_of_transport={2}, route={3})>".format(
+      self.__module__, type(self).__name__, self.mode_of_transport, self.route)
+
+    def __str__(self):
+        _str = "\n"
+        for s in self.stops:
+            for st in s.get_stop_objects:
+                _str += ", " + st.role + ' ' + st.primitive_type + ' ' + st.id
+                if st.member:
+                    _str += "\n" + str(st.member.tags)
+        return self.__repr__() + _str
+
     def inventorise_members(self):
         # split route relation members into stops, ways and other objects
         self.stops = []
@@ -588,7 +605,7 @@ class Itinerary:
                 if (hw_tag and node.tags['highway'] == 'bus_stop' or
                         rw_tag and node.tags['railway'] == 'tram_stop' or
                         pt_tag and node.tags['public_transport'] in ['platform', 'stop_position']):
-                    self.stops.append(member)
+                    self.stops.append(Stop.lookup[member.id])
                 else:
                     self.others.append(member)
             elif member.primitive_type == 'way':
@@ -610,6 +627,7 @@ class Itinerary:
         """
         if not self.stops:
             self.inventorise_members()
+        print(self.stops)
         self.stops = []
         stop = None
         for stop_id in new_stops_sequence:
@@ -624,11 +642,14 @@ class Itinerary:
 
         self.route.members = []  # type: List[RelationMember]
         for stop in self.stops:
-            self.route.members.extend(stop.get_stop_objects)
+            self.route.add_members(stop.get_stop_objects)
+        print(self.stops)
         for way in self.ways:
-            self.route.members.append(RelationMember(member=way))
-        for other in self.others:
-            self.route.members.append(RelationMember(member=other))
+            self.route.add_member(RelationMember(member=way))
+        # TODO figure out why so many ended up in self.others
+        #print('others:',self.others)
+        #for other in self.others:
+        #    self.route.members.append(RelationMember(member=other))
 
     @property
     def is_continuous(self) -> [bool, None]:
