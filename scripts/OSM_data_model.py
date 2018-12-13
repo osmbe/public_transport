@@ -158,7 +158,6 @@ class MapLayer:
                                   new_layer=new_layer,
                                   layer_name=layer_name)
                   }
-        print(params)
         return '<a href="{url}">{link_text}</a>'.format(**params)
 
 
@@ -334,6 +333,7 @@ class RelationMember(object):
     _instances = {}
 
     def __new__(cls, *args, **kwargs):
+        print(kwargs)
         member = kwargs['member']
         if 'primitive_type' in kwargs:
             primitive_type = kwargs['primitive_type']
@@ -428,10 +428,10 @@ class Relation(Primitive):
                 self.add_member(m, mark_modified)
 
     def add_member(self, member, mark_modified=True):
+        assert isinstance(member, RelationMember)
         self.members.append(member)
         if mark_modified:
             self.modified = True
-            print(self.attributes['action'])
 
     @property
     def xml(self):
@@ -528,10 +528,11 @@ class Itinerary:
 
        In OpenStreetMap it is mapped as a route relation"""
     lookup = {}  # type: Dict[str, Itinerary]
+
     def __init__(self, map_layer, route_relation=None, mode_of_transport=None,
                  stops=None, ways=None, extra_tags=None):
         """Either  there is a route relation, or one will be created based on the values in
-           stops, ways and tags.
+           stops, ways and extra_tags.
            :type map_layer: MapLayer
            :type stops: List[Stop]
            :type ways:  List[Way]"""
@@ -612,44 +613,32 @@ class Itinerary:
                 way = self.route.maplayer.primitives['ways'][member.id]  # type: Way
                 hw_tag = 'highway' in way.tags
                 rw_tag = 'railway' in way.tags
-                if (hw_tag and way.tags['highway'] != 'platform' and
-                        rw_tag and way.tags['railway'] != 'platform'):
-                    self.ways.append(member)
+                if (hw_tag and way.tags['highway'] == 'platform' or
+                        rw_tag and way.tags['railway'] == 'platform'):
+                    self.stops.append(member)
                 else:
-                    self.others.append(member)
+                    self.ways.append(member)
             else:
                 self.others.append(member)
 
     def update_stops(self, new_stops_sequence):
         """
 
-        :type new_stops_sequence: list[str]
+        :type new_stops_sequence: list[Stop]
         """
+        print(new_stops_sequence)
         if not self.stops:
             self.inventorise_members()
-        print(self.stops)
-        self.stops = []
-        stop = None
-        for stop_id in new_stops_sequence:
-            if isinstance(stop_id, str):
-                if stop_id in self.map_layer.primitives['nodes']:
-                    stop = self.map_layer.primitives['nodes'][stop_id]
-            elif isinstance(stop_id, Primitive):
-                stop = stop_id
-            else:
-                stop = Node(map_layer=self.map_layer, tags={'highway': 'bus_stop'})
-            self.stops.append(Stop(self.map_layer, stop))
+        self.stops = new_stops_sequence
 
         self.route.members = []  # type: List[RelationMember]
         for stop in self.stops:
             self.route.add_members(stop.get_stop_objects)
-        print(self.stops)
+
         for way in self.ways:
-            self.route.add_member(RelationMember(member=way))
-        # TODO figure out why so many ended up in self.others
-        #print('others:',self.others)
-        #for other in self.others:
-        #    self.route.members.append(RelationMember(member=other))
+            self.route.add_member(way)
+        for other in self.others:
+            self.route.members.append(other)
 
     @property
     def is_continuous(self) -> [bool, None]:
