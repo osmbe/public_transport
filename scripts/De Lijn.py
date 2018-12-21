@@ -6,15 +6,18 @@ query = '''
 [out:xml][timeout:90];
 (
   relation["operator"="De Lijn"]["ref"="305"];
+  node["operator"="De Lijn"];
 );
 (._;<;);
 (._;>>;);
 out meta;'''
 
+specific_tags = {}
+for t in ['ref', 'route_ref', 'zone']:
+    specific_tags[t] = t + ':De_Lijn'
+
 delijn = Agency(name='De Lijn',
-                zone_tag='zone:De_Lijn',
-                ref_tag='ref:De_Lijn',
-                route_ref_tag='route_ref:De_Lijn')
+                operator_specific_tags=specific_tags)
 api = overpy.Overpass()
 #osm_data = api.query(query)
 

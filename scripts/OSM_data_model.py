@@ -3,6 +3,8 @@ from typing import List, Dict, Any
 from urllib.parse import urlencode
 import xml.etree.ElementTree as eT
 
+public_transport_mode_of_transport = ['bus', 'coach', 'trolleybus',
+                                      'tram', 'subway', 'train']
 suitable_for = {'bus': {'highway': ['motorway',
                                     'trunk',
                                     'primary',
@@ -65,6 +67,9 @@ class MapLayer:
             raise ValueError('id should start with n, w or r')
 
     def from_overpy(self, osm_data):
+        """For all nodes, ways and relations in the data downloaded using overpy
+           add them to our map_layer instance and additionally create
+           Stop, Itinerary and Line instances for them, if applicable"""
         for node in osm_data.nodes:
             node.attributes['id'] = str(node.id)
             node.attributes['lon'] = node.lon
@@ -96,12 +101,12 @@ class MapLayer:
 
             if 'type' in rel.tags:
                 if rel.tags['type'] == 'route':
-                    Itinerary(map_layer=self, route_relation=rltn)
-                    continue
+                    if 'route' in rel.tags:
+                        if rel.tags['route'] in public_transport_mode_of_transport:
+                            Itinerary(map_layer=self, route_relation=rltn)
 
                 elif rel.tags['type'] == 'route_master':
                     Line(map_layer=self, route_master_relation=rltn)
-                    continue
 
     def xml(self, upload='false', generator=''):
         """
@@ -374,11 +379,11 @@ class RelationMember(object):
             self.role = ""
         else:
             self.role = role
-        self.member = None
+        self.primitive = None
 
         if isinstance(member, Primitive):
             self.id = member.id
-            self.member = member
+            self.primitive = member
         elif isinstance(member, str):
             self.id = member.strip()
         elif isinstance(member, int):
@@ -386,7 +391,7 @@ class RelationMember(object):
         else:
             raise ValueError("The id should either come from the primitive or be passed as a parameter")
 
-        if self.member:
+        if self.primitive:
             self.primitive_type = member.primitive
         elif primitive_type:
             self.primitive_type = primitive_type
@@ -470,24 +475,24 @@ class Stop:
         hw_tag = "highway" in primitive.tags
         rw_tag = 'railway' in primitive.tags
         if isinstance(primitive, RelationMember):
-            if isinstance(primitive.member, Node):
+            if isinstance(primitive.primitive, Node):
                 # It would be better to look at whether this node is a way
                 # node of a highway suitable for the mode of transport
-                pt_tag = "public_transport" in primitive.member.tags
-                hw_tag = "highway" in primitive.member.tags
-                rw_tag = "railway" in primitive.member.tags
-                if (pt_tag and primitive.member.tags['public_transport'] == 'platform' or
-                        hw_tag and primitive.member.tags['highway'] == 'bus_stop' or
-                        rw_tag and primitive.member.tags['railway'] == 'tram_stop'):
+                pt_tag = "public_transport" in primitive.primitive.tags
+                hw_tag = "highway" in primitive.primitive.tags
+                rw_tag = "railway" in primitive.primitive.tags
+                if (pt_tag and primitive.primitive.tags['public_transport'] == 'platform' or
+                        hw_tag and primitive.primitive.tags['highway'] == 'bus_stop' or
+                        rw_tag and primitive.primitive.tags['railway'] == 'tram_stop'):
                     self.platform_node = primitive
-                    self.lookup[primitive.member.id] = self
-                elif (pt_tag and primitive.member.tags['public_transport'] == 'stop_position'):
+                    self.lookup[primitive.primitive.id] = self
+                elif (pt_tag and primitive.primitive.tags['public_transport'] == 'stop_position'):
                     self.stop_position_node = primitive
-                    self.lookup[primitive.member.id] = self
-            if isinstance(primitive.member, Way):
-                if pt_tag and primitive.member.tags['public_transport'] == 'platform':
+                    self.lookup[primitive.primitive.id] = self
+            if isinstance(primitive.primitive, Way):
+                if pt_tag and primitive.primitive.tags['public_transport'] == 'platform':
                     self.platform_way = primitive
-                    self.lookup[primitive.member.id] = self
+                    self.lookup[primitive.primitive.id] = self
         elif isinstance(primitive, Node):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
                     hw_tag and primitive.tags['highway'] == 'bus_stop'):
@@ -510,7 +515,7 @@ class Stop:
                 self.lookup[primitive.id] = self
 
     @property
-    def get_stop_objects(self):
+    def get_stop_primitives(self):
         result = []  # type: List[RelationMember]
         for o in [self.stop_position_node, self.platform_node, self.platform_way]:
             if o:
@@ -566,7 +571,7 @@ class Itinerary:
 
             members = []
             for stop in self.stops:
-                members.extend(stop.get_stop_objects)
+                members.append(stop)
             for way in self.ways:
                 members.append(RelationMember(way))
             self.route = Relation(map_layer,
@@ -586,10 +591,10 @@ class Itinerary:
     def __str__(self):
         _str = "\n"
         for s in self.stops:
-            for st in s.get_stop_objects:
+            for st in s.get_stop_primitives:
                 _str += ", " + st.role + ' ' + st.primitive_type + ' ' + st.id
-                if st.member:
-                    _str += "\n" + str(st.member.tags)
+                if st.primitive:
+                    _str += "\n" + str(st.primitive.tags)
         return self.__repr__() + _str
 
     def inventorise_members(self):
@@ -633,7 +638,7 @@ class Itinerary:
 
         self.route.members = []  # type: List[RelationMember]
         for stop in self.stops:
-            self.route.add_members(stop.get_stop_objects)
+            self.route.add_members(stop.get_stop_primitives)
 
         for way in self.ways:
             self.route.add_member(way)

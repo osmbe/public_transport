@@ -17,16 +17,19 @@ class Agency:
     agency_data = {}  # type: Dict[str, pd.DataFrame]
     sheet_filename = 'temp.xlsx'
 
-    def __init__(self, name, ref_tag='ref', route_ref_tag='route_ref', zone_tag='zone'):
+    def __init__(self, name, operator_specific_tags=None):
+        if operator_specific_tags is None:
+            self.operator_specific_tags = {'ref':       'ref',
+                                           'route_ref': 'route_ref',
+                                           'zone':      'zone'}
+        else:
+            self.operator_specific_tags = operator_specific_tags
+
         self.name = name
         # dictionaries indexed on identifiers used at the operator/agency
         self.lines = {}
         self.itineraries = {}  # {'3303': [PublicTransportRoute, PublicTransportRoute, PublicTransportRoute]}
         self.stops = {}
-
-        self.ref_tag = ref_tag
-        self.route_ref_tag = route_ref_tag
-        self.zone_tag = zone_tag
 
         self.map_layer = osm.MapLayer()
 
@@ -35,47 +38,58 @@ class Agency:
         self.populate_from_osm_data()
 
     def populate_from_osm_data(self):
-        '''After downloading data using overpy for a region, an operator or a line,
-           this method inventorises stops, lines and itineraries
+        """After downloading data using overpy for a region, an operator or a line,
+           this method inventorises all Stop, Line and Itinerary instances encountered in it.
 
            The identifiers used as keys in these dictionaries are the identifiers used
-           by the agency.'''
+           by the agency."""
         for stop_id in osm.Stop.lookup:
             stop = osm.Stop.lookup[stop_id]  # type: Stop
-            for stop_object_member in stop.get_stop_objects:  # type: RelationMember
-                if isinstance(stop_object_member.member, osm.Primitive):
-                    stop_object = stop_object_member.member
+            # A stop can consist of multiple OSM primitives
+            for stop_object_member in stop.get_stop_primitives:  # type: RelationMember
+                if isinstance(stop_object_member.primitive, osm.Primitive):
+                    # in a Stop instance we can have a RelationMember with an actual
+                    # OSM primitive
+                    stop_primitive = stop_object_member.primitive
                 else:
+                    # Or we can simply have the OSM id
+                    # TODO we should check primtype to distinguish nodes from ways
                     try:
-                        stop_object = osm.MapLayer.primitives['nodes'][stop_object_member.id]
+                        stop_primitive = osm.MapLayer.primitives['nodes'][stop_object_member.id]
                     except KeyError:
                         try:
-                            stop_object = osm.MapLayer.primitives['ways'][stop_object_member.id]
+                            stop_primitive = osm.MapLayer.primitives['ways'][stop_object_member.id]
                         except KeyError:
+                            # If the primitive wasn't downloaded, we won't be able to look
+                            # at its tags
                             continue
-                print(stop_object.id)
-                if self.ref_tag in stop_object.tags:
-                    self.stops[stop_object.tags[self.ref_tag]] = stop
+                print(self.operator_specific_tags)
+                if self.operator_specific_tags['ref'] in stop_primitive.tags:
+                    self.stops[stop_primitive.tags[self.operator_specific_tags['ref']]] = stop
         for itinerary_id in osm.Itinerary.lookup:
             itinerary = osm.Itinerary.lookup[itinerary_id]
-            print('Adding ' + str(itinerary) + ' to self.itineraries')
-            if self.ref_tag in itinerary.route.tags:
-                self.itineraries.setdefault(itinerary.route.tags[self.ref_tag], []).append(itinerary)
+            if self.operator_specific_tags['ref'] in itinerary.route.tags:
+                self.itineraries.setdefault(itinerary.route.tags[self.operator_specific_tags['ref']], []).append(itinerary)
         for line_id in osm.Line.lookup:
             line = osm.Line.lookup[line_id]
-            print(line_id, line.route_master)
-            tags = line.route_master.tags
-            if self.ref_tag in tags:
-                self.lines[tags[self.ref_tag]] = line
+            if self.operator_specific_tags['ref'] in line.route_master.tags:
+                self.lines[line.route_master.tags[self.operator_specific_tags['ref']]] = line
 
     def fetch_agency_data(self, sheet_url):
-        with open(self.sheet_filename, 'wb') as out_file:
-            shutil.copyfileobj(requests.get(sheet_url, stream=True).raw, out_file)
+        """Downloads a Google Sheet and saves it locally"""
+        try:
+            # TODO check for internet connection before downloading
+            with open(self.sheet_filename, 'wb') as out_file:
+                shutil.copyfileobj(requests.get(sheet_url, stream=True).raw, out_file)
+        except:
+            return None
 
-    def load_agency_data(self):
-        # TODO test if self.sheet_filename is present
-        # sheet_name means to read all the sheets
+    def load_agency_data(self, timeout=90):
+        lstat = os.lstat(self.sheet_filename)
+        print(lstat)
+        # TODO test if self.sheet_filename is present and older than an hour
         data = pd.read_excel(self.sheet_filename, sheet_name=None)
+        #                                         sheet_name=None means to read all the sheets
         stops = data['Stops']
         stops.stopidentifier = stops.stopidentifier.astype(str)
         self.agency_data = {'stops': stops.set_index('stopidentifier'),
@@ -99,7 +113,8 @@ class Agency:
             try:
                 operator_stop = self.agency_data['stops'].loc[stop]
             except:
-                self.stops[stop].tags['created_by'] = "This stop doesn't seem to exist anymore"
+                for rm in self.stops[stop].get_stop_primitives:
+                    rm.primitive.tags['created_by'] = "This stop doesn't seem to exist anymore"
                 continue
             """
             # Compare name tag
@@ -108,39 +123,62 @@ class Agency:
                 self.stops[stop].tags['name'] = operator_stop.stopdescription
 
             # Compare route_ref tag
-            if self.stops[stop].tags[self.route_ref_tag] != operator_stop.route_ref_calculated:
+            if self.stops[stop].tags[self.route_operator_specific_tags['ref']] != operator_stop.route_ref_calculated:
                 # print('route_ref not equal')
-                self.stops[stop].tags[self.route_ref_tag] = operator_stop.route_ref_calculated
+                self.stops[stop].tags[self.route_operator_specific_tags['ref']] = operator_stop.route_ref_calculated
             """
 
     def compare_itineraries(self):
         for itinerary in self.itineraries:
             # find its counterpart in the operator data
             try:
-                signatures = self.agency_data['itineraries'].loc[int(itinerary)].values
+                signatures = (self.agency_data['itineraries'].loc[int(itinerary)].values)  # type: str
             except:
                 continue
-            itineraries_signatures = self.discard_shorter_variants_of_telescopic_itineraries(signatures)
 
-            route_signatures = {}
-            for itin in self.itineraries[itinerary]:
-                route_signatures[itin.route.id] = ",".join(self.create_stops_list(itin))
-
-                if route_signatures[itin.route.id] in itineraries_signatures:
-                    # exact match, just remove this sequence from operator's signatures.
-                    # print (route_signatures[pt_route.id], 'matches exactly.')
-                    del itineraries_signatures[route_signatures[itin.route.id]]
-                else:
-                    pass  # print ('no match yet for', route_signatures[pt_route.id])
-                for rtsig in route_signatures:
-                    # The exact matches are already resolved, so now we need to try
-                    # and find which stops sequences from agency are closest.
-                    self.match_itineraries(itin, itineraries_signatures, route_signatures, rtsig)
+            itineraries_signatures = (
+                self.unmatched_stop_sequences(
+                    itinerary,
+                    self.discard_shorter_variants_of_telescopic_itineraries(signatures)
+                )
+            )
 
             for itsig in itineraries_signatures:
                 # For all the remaining ones new route relations need to be created
+                stop_members = []
                 if itineraries_signatures[itsig]:
-                    print('todo:', itsig)
+                    for stop_ref in itsig.split(','):
+                        if stop_ref in self.stops:
+                            stop = self.stops[stop_ref]
+                            print(stop)
+                            stop_members.extend(stop.get_stop_primitives)
+                        else:
+                            # TODO investigate how this can happen
+                            print(stop_ref, 'stop not found in downloaded data', type(stop_ref))
+                    new_itinerary = osm.Itinerary(map_layer=self.map_layer,
+                                                  mode_of_transport='bus',
+                                                  stops=stop_members,
+                                                  extra_tags={'odbl': 'tttttt',
+                                                              'operator': 'De Lijn',
+                                                              }
+                                                  )
+
+    def unmatched_stop_sequences(self, itinerary, itineraries_signatures):
+        route_signatures = {}
+        for itin in self.itineraries[itinerary]:
+            route_signatures[itin.route.id] = ",".join(self.create_stops_list(itin))
+
+            if route_signatures[itin.route.id] in itineraries_signatures:
+                # exact match, just remove this sequence from operator's signatures.
+                # print (route_signatures[pt_route.id], 'matches exactly.')
+                del itineraries_signatures[route_signatures[itin.route.id]]
+            else:
+                pass  # print ('no match yet for', route_signatures[pt_route.id])
+            for rtsig in route_signatures:
+                # The exact matches are already resolved, so now we need to try
+                # and find which stops sequences from agency are closest.
+                self.match_itineraries(itin, itineraries_signatures, route_signatures, rtsig)
+        return itineraries_signatures
 
     def discard_shorter_variants_of_telescopic_itineraries(self, signatures):
         itineraries_signatures = {}
@@ -155,10 +193,10 @@ class Agency:
             itineraries_signatures[signature[0]] = True
         return itineraries_signatures
 
-    def create_stops_list(self, itin):
+    def create_stops_list(self, itinerary):
         stopslist = []
-        for stop in itin.stops:
-            for stop_member in stop.get_stop_objects:
+        for stop in itinerary.stops:
+            for stop_member in stop.get_stop_primitives:
                 if stop_member.id in self.map_layer.primitives['nodes']:
                     nd = self.map_layer.primitives['nodes'][stop_member.id]
                 else:
@@ -166,7 +204,7 @@ class Agency:
                     # The Overpass query should have downloaded all child objects
                     print(stop_member.id, ' was not found in downloaded data')
                     continue
-                stopslist.append(nd.tags[self.ref_tag])
+                stopslist.append(nd.tags[self.operator_specific_tags['ref']])
         return stopslist
 
     def match_itineraries(self, itin, itineraries_signatures, route_signatures, rtsig):
@@ -184,10 +222,23 @@ class Agency:
                     # need to find the itinerary with route relation id rtsig
                     stops_list = []
                     for stop in best_match.split(','):
-                        try:
+                        if stop in self.stops:
                             stops_list.append(self.stops[stop])
-                        except KeyError:
-                            stops_list.append(stops_list[0])
+                        else:
+                            try:
+                                stop_data = self.agency_data['stops'].loc[str(stop)]
+                            except:
+                                continue
+                            stops_list.append(Stop(map_layer=self.map_layer,
+                                                   primitive=osm.Node(map_layer=self.map_layer,
+                                                                      tags={'name': stop_data.stopdescription,
+                                                                            self.operator_specific_tags['ref']: stop_data.stopidentfier,
+                                                                            'operator': 'De Lijn',
+                                                                            'url': 'mijnlijn.be/' + stop_data.stopidentfier,
+                                                                            }
+                                                                      )
+                                                   )
+                                              )
                     itin.update_stops(stops_list)
                     route_signatures[rtsig] = None
                     itineraries_signatures[best_match] = None
@@ -195,8 +246,8 @@ class Agency:
     def compare_lines(self):
         for line in self.lines:
             for route_member in self.lines[line].route_master.members:
-                if not (self.ref_tag in self.map_layer.primitives['relations'][route_member.id].tags):
-                    self.map_layer.primitives['relations'][route_member.id].add_tag(self.ref_tag, line)
+                if not (self.operator_specific_tags['ref'] in self.map_layer.primitives['relations'][route_member.id].tags):
+                    self.map_layer.primitives['relations'][route_member.id].add_tag(self.operator_specific_tags['ref'], line)
             try:
                 operator_line = self.agency_data['lines'].loc[line]
             except:
@@ -212,7 +263,7 @@ class Agency:
     def write_xml_to_file(self, filename):
         self.map_layer.xml().write(filename)
 
-    def send_to_josm(self, new_layer=True, layer_name = 'Data from operator'):
+    def send_to_josm(self, new_layer=True, layer_name='Data from operator'):
         remote_control_base_url = "http://127.0.0.1:8111/"
         filename = layer_name + '.osm'
         params = {'layer_name': layer_name}
@@ -228,7 +279,8 @@ class Agency:
             print('JOSM is not running locally')
             # send our osm file to a remote location
             result = requests.post('https://file.io', files={'file': open(filename, 'rb')})
-            remote_control_import_url = remote_control_base_url + "import?" + urlencode(params) + "&url=" + result.json()['link']
+            remote_control_import_url = remote_control_base_url + "import?" + urlencode(params) + "&url=" + \
+                                        result.json()['link']
             # and give the user a link to invoke JOSM through the browser
             # on their local machine
             print(remote_control_import_url)
