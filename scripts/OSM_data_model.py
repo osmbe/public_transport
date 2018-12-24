@@ -18,32 +18,42 @@ suitable_for = {'bus': {'highway': ['motorway',
                         'psv': ['yes', 'designated'],
                         },
                 'coach': {'highway': ['motorway',
-                                    'trunk',
-                                    'primary',
-                                    'secondary',
-                                    'tertiary',
-                                    'unclassified',
-                                    'residential',
-                                    'service',
-                                    ],
-                        },
+                                      'trunk',
+                                      'primary',
+                                      'secondary',
+                                      'tertiary',
+                                      'unclassified',
+                                      'residential',
+                                      'service',
+                                      ],
+                          },
                 'trolleybus': {'trolley_wire': 'yes'
                                },
                 'tram': {'railway': ['tram'],
                          },
                 'subway': {'railway': ['subway'],
-                         },
+                           },
                 'train': {'railway': ['rail']
-                         },
+                          },
                 }
+
 
 class MapLayer:
     primitives = {'nodes': {},
-                   'ways': {},
-                   'relations': {}
-                   }
-    def __init__(self):
+                  'ways': {},
+                  'relations': {}
+                  }
+
+    def __init__(self, right_hand_side_traffic=True):
+        """
+
+        :type right_hand_side_traffic: bool
+        """
+        self.only_include_modified=True
         self.edges = {}
+        self.stop_right_from_way = {}  # {way_id: [Stop, Stop, ...]}
+        self.stop_left_from_way = {}  # {way_id: [Stop, Stop, ...]}
+        self.right_hand_side_traffic = right_hand_side_traffic
 
     def get_primitive(self, primitive):
         prim = primitive[0]  # type: str
@@ -70,6 +80,7 @@ class MapLayer:
         """For all nodes, ways and relations in the data downloaded using overpy
            add them to our map_layer instance and additionally create
            Stop, Itinerary and Line instances for them, if applicable"""
+        print("Reading nodes")
         for node in osm_data.nodes:
             node.attributes['id'] = str(node.id)
             node.attributes['lon'] = node.lon
@@ -78,6 +89,7 @@ class MapLayer:
                                                 attributes=node.attributes,
                                                 tags=node.tags))
 
+        print("Reading ways")
         for way in osm_data.ways:
             way.attributes['id'] = str(way.id)
             Stop(map_layer=self, primitive=Way(map_layer=self,
@@ -85,6 +97,7 @@ class MapLayer:
                                                tags=way.tags,
                                                nodes=way.nodes))
 
+        print("Reading relations")
         for rel in osm_data.relations:
             members = []
             for member in rel.members:
@@ -108,11 +121,14 @@ class MapLayer:
                 elif rel.tags['type'] == 'route_master':
                     Line(map_layer=self, route_master_relation=rltn)
 
-    def xml(self, upload='false', generator=''):
+    def xml(self, upload='false', generator='', only_include_modified=True):
         """
+        :param only_include_modified: bool
         :type upload: str
         :type generator: string documentation to be added to OSM xml file for tool that generated the XML data
         """
+        print("Generating XML")
+        self.only_include_modified=only_include_modified
         assert isinstance(upload, str), "upload is not a string: %r" % upload
         xml_attributes = {'version': '0.6', 'upload': upload}
 
@@ -123,7 +139,8 @@ class MapLayer:
 
         for primtype in ('nodes', 'ways', 'relations'):
             for prim_id in self.primitives[primtype]:
-                osm_xml_root.extend([self.primitives[primtype][prim_id].xml])
+                xml = self.primitives[primtype][prim_id].xml
+                osm_xml_root.extend([xml])
         return eT.ElementTree(element=osm_xml_root)
 
     def url(self, upload='false', generator='', new_layer=True, layer_name=''):
@@ -169,6 +186,8 @@ class MapLayer:
 class Primitive:
     """Base class with common functionality between Nodes, Ways and Relations"""
     counter = -10000
+    _parent_ways = {}
+    _parent_relations = {}
 
     def __init__(self, map_layer, primitive, attributes=None, tags=None):
         self.maplayer = map_layer
@@ -237,6 +256,27 @@ class Primitive:
 
     @property
     def xml(self):
+        if self.maplayer.only_include_modified:
+            # Check if primitive itself is modified
+            if ('action' in self.attributes and
+                    not self.attributes['action'] == 'modify'):
+                # if it isn't check its parents and grandparents
+                parent_modified = False
+                grand_parent_modified = False
+                for p in self.get_parents:
+                    if ('action' in p.attributes
+                            and p.attributes['action'] == 'modify'):
+                        parent_modified = True
+                        break
+                    for gp in p.get_parents:
+                        if ('action' in gp.attributes
+                                and gp.attributes['action'] == 'modify'):
+                            grand_parent_modified = True
+                            break
+                    if grand_parent_modified: break
+                if not (parent_modified or
+                        grand_parent_modified):
+                    return ''
         xml_attributes = {}
         for attr in self.attributes:
             assert isinstance(attr, str), "attr is not a string: %r" % attr
@@ -255,15 +295,36 @@ class Primitive:
                              ])
         return _xml
 
+    @property
     def get_parents(self):
         parents = []
-        for way in self.maplayer.primitives['ways']:
-            if self.attributes['id'] in way.get_nodes():
-                parents.append(way)
-        for relation in self.maplayer.primitives['relations']:
-            if self.attributes['id'] in relation.get_members():
-                parents.append(relation)
+        if self.id in self._parent_ways:
+            parents.append(self._parent_ways[self.id])
+        if self.id in self._parent_relations:
+            parents.append(self._parent_relations[self.id])
         return parents
+
+    @property
+    def get_parent_ways(self):
+        if self.id in self._parent_ways:
+            return self._parent_ways[self.id]
+        else:
+            self._parent_ways[self.id] = []
+            for way in self.maplayer.primitives['ways']:
+                if self.id in way.get_nodes():
+                    self._parent_ways[self.id].append(way)
+            return self._parent_ways[self.id]
+
+    @property
+    def get_parent_relations(self):
+        if self.id in self._parent_relations:
+            return self._parent_relations[self.id]
+        else:
+            self._parent_relations[self.id] = []
+            for relation in self.maplayer.primitives['relations']:
+                if self.id in relation.get_members():
+                    self._parent_relations[self.id].append(relation)
+            return self._parent_relations[self.id]
 
 
 class Node(Primitive):
@@ -338,7 +399,6 @@ class RelationMember(object):
     _instances = {}
 
     def __new__(cls, *args, **kwargs):
-        print(kwargs)
         member = kwargs['member']
         if 'primitive_type' in kwargs:
             primitive_type = kwargs['primitive_type']
@@ -396,7 +456,8 @@ class RelationMember(object):
         elif primitive_type:
             self.primitive_type = primitive_type
         else:
-            raise ValueError("It should either be possible to infer the primitive's type from member, or passed as a parameter")
+            raise ValueError(
+                "It should either be possible to infer the primitive's type from member, or passed as a parameter")
 
     @property
     def xml(self):
@@ -463,6 +524,11 @@ class Stop:
         self.platform_node = None
         self.platform_way = None
 
+        # the highway just before and just after the stop.
+        # If the way is not split near the stop, there is just a single item in the list
+        # If the way is split, the list has 2 items
+        self.adjacent_ways = [None]
+
         if isinstance(primitive, Primitive):
             self.add(primitive)
 
@@ -493,6 +559,7 @@ class Stop:
                 if pt_tag and primitive.primitive.tags['public_transport'] == 'platform':
                     self.platform_way = primitive
                     self.lookup[primitive.primitive.id] = self
+
         elif isinstance(primitive, Node):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
                     hw_tag and primitive.tags['highway'] == 'bus_stop'):
@@ -505,6 +572,18 @@ class Stop:
                                                          primitive_type='node',
                                                          member=primitive)
                 self.lookup[primitive.id] = self
+            elif hw_tag and primitive.tags['highway'] == 'bus_stop':
+                if primitive.get_parent_ways in suitable_for['bus']['highway']:
+                    self.stop_position_node = RelationMember(role='stop',
+                                                             primitive_type='node',
+                                                             member=primitive)
+                    self.lookup[primitive.id] = self
+                else:
+                    self.platform_node = RelationMember(role='platform',
+                                                        primitive_type='node',
+                                                        member=primitive)
+                    self.lookup[primitive.id] = self
+
         elif isinstance(primitive, Way):
             if (pt_tag and primitive.tags['public_transport'] == 'platform' or
                     hw_tag and primitive.tags['highway'] == 'platform' or
@@ -586,7 +665,7 @@ class Itinerary:
 
     def __repr__(self):
         return "<{0}.{1}(mode_of_transport={2}, route={3})>".format(
-      self.__module__, type(self).__name__, self.mode_of_transport, self.route)
+            self.__module__, type(self).__name__, self.mode_of_transport, self.route)
 
     def __str__(self):
         _str = "\n"
@@ -631,7 +710,6 @@ class Itinerary:
 
         :type new_stops_sequence: list[Stop]
         """
-        print(new_stops_sequence)
         if not self.stops:
             self.inventorise_members()
         self.stops = new_stops_sequence
@@ -695,8 +773,8 @@ class Line:
 
 
 class Edge:
-    """An edge is a sequence of ways that are connected to one another, they can either be between where highways fork,
-       or where PT routes fork. An edge can contain shorter edges"""
+    """An edge is a logical sequence of ways, they can either be the ways between where highways fork,
+       or where routes fork. An edge can contain shorter edges"""
 
     def __init__(self, parts=None):
         self.parts = []
@@ -765,19 +843,19 @@ if __name__ == '__main__':
                                     }
                           )
     stop_position_node1 = Node(ml, tags={'name': 'First halt',
-                                    'public_transport': 'stop_position',
-                                    'bus': 'yes',
+                                         'public_transport': 'stop_position',
+                                         'bus': 'yes',
+                                         }
+                               )
+    platform_node2 = Node(ml, tags={'name': 'Second halt',
+                                    'ref': '125',
+                                    'highway': 'bus_stop'
                                     }
                           )
-    platform_node2 = Node(ml,tags={'name': 'Second halt',
-                                   'ref': '125',
-                                   'highway': 'bus_stop'
-                                   }
-                          )
-    platform_node3 = Node(ml,tags={'name': 'Third halt',
-                                   'ref': '127',
-                                   'highway': 'bus_stop'
-                                   }
+    platform_node3 = Node(ml, tags={'name': 'Third halt',
+                                    'ref': '127',
+                                    'highway': 'bus_stop'
+                                    }
                           )
 
     stop1 = Stop(ml, platform_node1)
