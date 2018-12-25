@@ -1,4 +1,6 @@
+import math
 import os
+import re
 from typing import Dict, Any
 from urllib.parse import urlencode
 
@@ -17,13 +19,21 @@ class Agency:
     agency_data = {}  # type: Dict[str, pd.DataFrame]
     sheet_filename = 'temp.xlsx'
 
-    def __init__(self, name, operator_specific_tags=None):
+    def __init__(self, name, operator_specific_tags=None, shorten_stop_nameRE=None):
         if operator_specific_tags is None:
             self.operator_specific_tags = {'ref':       'ref',
                                            'route_ref': 'route_ref',
                                            'zone':      'zone'}
         else:
             self.operator_specific_tags = operator_specific_tags
+        if shorten_stop_nameRE:
+            self.shorten_stop_nameRE = shorten_stop_nameRE
+        else:
+            self.shorten_stop_nameRE = re.compile(r"""(?xiu)
+                                                      (?P<name>[\s*\S]+?)
+                                                      (?P<platform>\s*-?\s*platform\s*\d(\sand\s\d)*)?
+                                                      $
+					                     """)
 
         self.name = name
         # dictionaries indexed on identifiers used at the operator/agency
@@ -132,41 +142,83 @@ class Agency:
 
     def compare_itineraries(self):
         print("Compare itineraries (route relations)")
+        print("Itineraries to start with", self.itineraries)
         for itinerary in self.itineraries:
             # find its counterpart in the operator data
             try:
-                signatures = self.agency_data['itineraries'].loc[int(itinerary)].values.str  # type: str
+                signatures = self.agency_data['itineraries'].loc[int(itinerary)].values  # type: str
             except:
                 continue
+            print('starting with:', len(signatures))
             itineraries_signatures = (
                 self.unmatched_stop_sequences(
                     itinerary,
                     self.discard_shorter_variants_of_telescopic_itineraries(signatures)
                 )
             )
+            self.create_new_itineraries_for_remaining_stop_signatures(itineraries_signatures, itinerary)
 
-            for itsig in itineraries_signatures:
-                # For all the remaining ones new route relations need to be created
-                stop_members = []
-                if itineraries_signatures[itsig]:
-                    for stop_ref in itsig.split(','):
-                        if stop_ref in self.stops:
-                            stop = self.stops[stop_ref]
-                            stop_members.extend(stop.get_stop_primitives)
-                        else:
-                            # TODO investigate how this can happen
-                            print(stop_ref, 'stop not found in downloaded data', type(stop_ref))
-                    new_itinerary = osm.Itinerary(map_layer=self.map_layer,
-                                                  mode_of_transport='bus',
-                                                  stops=stop_members,
-                                                  extra_tags={'odbl': 'tttttt',
-                                                              'operator': 'De Lijn',
-                                                              }
-                                                  )
+    def create_new_itineraries_for_remaining_stop_signatures(self, itineraries_signatures, itinerary):
+        print('remaining:', len(itineraries_signatures))
+        for itsig in itineraries_signatures:
+            # For all the remaining ones new route relations need to be created
+            print(itsig, itineraries_signatures[itsig])
+            stop_members = []
+            if itineraries_signatures[itsig]:
+                for stop_ref in itsig.split(','):
+                    if stop_ref in self.stops:
+                        stop = self.stops[stop_ref]
+                        stop_members.extend(stop.get_stop_primitives)
+                    else:
+                        # TODO investigate how this can happen
+                        print(stop_ref, 'stop not found in downloaded data', type(stop_ref))
+
+                line_data_from_operator = self.agency_data['lines'].loc[int(itinerary)]
+                nodes = self.map_layer.primitives['nodes']
+                tags = {'ref': line_data_from_operator['routepublicidentifier'],
+                        'from': nodes[stop_members[0].id].tags['name'],
+                        'to': nodes[stop_members[-1].id].tags['name'],
+                        'odbl': 'tttttt',
+                        }
+                if itinerary in self.lines:
+                    line = self.lines[itinerary] # type: osm.Line
+                    for tag in ['operator', 'operator:wikidata',
+                                'network', 'network:wikidata',
+                                'colour', 'url', 'bus',
+                                self.operator_specific_tags['ref']]:
+                        if tag in line.route_master.tags:
+                            tags[tag] = line.route_master.tags[tag]
+                    tags['name'] = ''
+                    if 'operator' in tags:
+                        tags['name'] += tags['operator']
+                    if 'ref' in tags:
+                        tags['name'] += ' ' + str(tags['ref'])
+                    if 'from' in tags:
+                        tags['name'] += ' ' + re.search(self.shorten_stop_nameRE,tags['from']).group('name')
+                    if 'via' in tags:
+                        tags['name'] += ' - ' + re.search(self.shorten_stop_nameRE,tags['via']).group('name')
+                    if 'to' in tags:
+                        tags['name'] += ' - ' + re.search(self.shorten_stop_nameRE, tags['to']).group('name')
+                else:
+                    # TODO If there is no route_master relation yet,
+                    # it probably would need to be created (first)
+                    print('no route master for:', itinerary)
+                if str(line_data_from_operator['mode']):
+                    tags['route'] = str(line_data_from_operator['mode'])
+
+                if not math.isnan(line_data_from_operator['type']):
+                    tags['bus'] = str(line_data_from_operator['type'])
+                line.add_route(osm.Itinerary(map_layer=self.map_layer,
+                                             mode_of_transport=line_data_from_operator['routeservicemode'],
+                                             stops=stop_members,
+                                             extra_tags=tags
+                                             )
+                               )
 
     def unmatched_stop_sequences(self, itinerary, itineraries_signatures):
         route_signatures = {}
         for itin in self.itineraries[itinerary]:
+            print('itinerary',itin)
             route_signatures[itin.route.id] = ",".join(self.create_stops_list(itin))
 
             if route_signatures[itin.route.id] in itineraries_signatures:
@@ -174,6 +226,7 @@ class Agency:
                 del itineraries_signatures[route_signatures[itin.route.id]]
 
             for rtsig in route_signatures:
+                print('route signature',rtsig)
                 # The exact matches are already resolved, so now we need to try
                 # and find which stops sequences from agency are closest.
                 self.match_itineraries(itin, itineraries_signatures, route_signatures, rtsig)
@@ -184,8 +237,10 @@ class Agency:
         for signature in signatures:
             for key in list(itineraries_signatures.keys()):
                 if signature[0] in key:
+                    print(signature[0], 'found in', key, 'moving on')
                     continue
                 elif key in signature[0]:
+                    print(key, '\nfound in\n', signature[0], '\nkeep longer variant')
                     del itineraries_signatures[key]
             itineraries_signatures[signature[0]] = True
         return itineraries_signatures
@@ -207,7 +262,9 @@ class Agency:
     def match_itineraries(self, itin, itineraries_signatures, route_signatures, rtsig):
         highest_score = 0.0
         best_match = ''
+        #print(rtsig)
         for itsig in itineraries_signatures:
+            #print(itsig)
             if route_signatures[rtsig]:
                 cur = SequenceMatcher(None, route_signatures[rtsig], itsig).ratio()
                 if cur > highest_score:

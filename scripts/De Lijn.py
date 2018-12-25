@@ -2,6 +2,7 @@ from scripts.Agency import Agency
 import overpy
 import os
 from requests import post
+import re
 
 use_test_data = False
 download_again = True
@@ -17,9 +18,9 @@ download_again = True
 # out meta;'''
 
 query = '''
-[out:xml][timeout:590];
+[out:xml][timeout:290];
 (
-  relation["operator"="De Lijn"]["ref"="600"];
+  relation["operator"="De Lijn"]["ref"="305"];
 );
 
 (._;>>;);
@@ -32,7 +33,13 @@ for t in ['ref', 'route_ref', 'zone']:
     specific_tags[t] = t + ':De_Lijn'
 
 delijn = Agency(name='De Lijn',
-                operator_specific_tags=specific_tags)
+                operator_specific_tags=specific_tags,
+                shorten_stop_nameRE=re.compile(r"""(?xiu)
+                                                      (?P<name>[\s*\S]+?)
+                                                      (?P<platform>\s*-?\s*perron\s*\d+(\sen\s\d+)*)?
+                                                      $
+					                     """)
+                )
 
 if download_again:
     print('Downloading OSM data to file')
