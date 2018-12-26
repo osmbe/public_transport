@@ -613,7 +613,7 @@ class Itinerary:
        In OpenStreetMap it is mapped as a route relation"""
     lookup = {}  # type: Dict[str, Itinerary]
 
-    def __init__(self, map_layer, route_relation=None, mode_of_transport=None,
+    def __init__(self, map_layer, route_relation=None, mode_of_transport='bus',
                  stops=None, ways=None, extra_tags=None):
         """Either  there is a route relation, or one will be created based on the values in
            stops, ways and extra_tags.
@@ -637,15 +637,11 @@ class Itinerary:
         else:
             tags = extra_tags
 
-        if mode_of_transport:
-            self.mode_of_transport = mode_of_transport
-        else:
-            self.mode_of_transport = ''
+        self.mode_of_transport = mode_of_transport
 
         if route_relation is None:
             tags['type'] = 'route'
-            if self.mode_of_transport:
-                tags['route'] = self.mode_of_transport
+            tags['route'] = self.mode_of_transport
             tags['public_transport:version'] = '2'
 
             members = []
@@ -749,17 +745,26 @@ class Line:
        In OpenStreetMap it is mapped as a route_master relation"""
     lookup = {}  # type: Dict[str, Line]
 
-    def __init__(self, map_layer, route_master_relation=None, extratags=None):
+    def __init__(self, map_layer, route_master_relation=None, mode_of_transport='bus', extra_tags=None):
         """:type map_layer: MapLayer
         """
         self.map_layer = map_layer
-        self.route_master = route_master_relation
+        self.mode_of_transport = mode_of_transport
 
-        if self.route_master is None:
-            if extratags is None:
-                tags = {'type': 'route_master'}
+        if extra_tags is None:
+            tags = {}
+        else:
+            tags = extra_tags
+
+        if isinstance(route_master_relation, Relation):
+            if route_master_relation.tags['type'] == 'route_master':
+                self.route_master = route_master_relation
+                self.mode_of_transport = self.route_master.tags['route_master']
             else:
-                tags = extratags
+                raise ValueError("Only route_master relations should be added to a Line")
+        else:
+            tags['type'] = 'route_master'
+            tags['route_master'] = self.mode_of_transport
 
             self.route_master = Relation(map_layer,
                                          tags=tags)

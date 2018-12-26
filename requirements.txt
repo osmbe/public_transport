@@ -1,7 +1,9 @@
-xlrd
 Django==1.10.5
 flup6==1.1.1
 py-postgresql==1.2.1
 requests==2.13.0
 urllib3==1.20
 overpy
+typing
+pandas
+openpyxl

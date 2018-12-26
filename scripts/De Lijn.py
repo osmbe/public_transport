@@ -32,13 +32,29 @@ specific_tags = {}
 for t in ['ref', 'route_ref', 'zone']:
     specific_tags[t] = t + ':De_Lijn'
 
+wikidata = {'De Lijn': '',
+            'DlAn': '',
+            'DlOV': '',
+            'DlVB': '',
+            'DlLi': '',
+            'DlWV': '',
+            }
 delijn = Agency(name='De Lijn',
                 operator_specific_tags=specific_tags,
-                shorten_stop_nameRE=re.compile(r"""(?xiu)
+                shorten_stop_name_regex=re.compile(r"""(?xiu)
                                                       (?P<name>[\s*\S]+?)
                                                       (?P<platform>\s*-?\s*perron\s*\d+(\sen\s\d+)*)?
                                                       $
-					                     """)
+					                     """),
+                url_for_stops="mijnlijn.be/{stopidentifier}",
+                url_for_lines="https://www.delijn.be/nl/lijnen/lijn/{routeidentifier}[0]/{routeidentifier}[1:]",
+                url_for_itineraries="https://www.delijn.be/nl/lijnen/lijn/{routeidentifier}[0]/{routeidentifier}[1:]",
+                networks={1: 'An',
+                          2: 'OV',
+                          3: 'VB',
+                          4: 'Li',
+                          5: 'WV'},
+                wikidata = wikidata,
                 )
 
 if download_again:
