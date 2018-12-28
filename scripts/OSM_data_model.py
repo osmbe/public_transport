@@ -80,7 +80,7 @@ class MapLayer:
         """For all nodes, ways and relations in the data downloaded using overpy
            add them to our map_layer instance and additionally create
            Stop, Itinerary and Line instances for them, if applicable"""
-        print("Reading nodes")
+        print(f"Reading {len(osm_data.nodes)} nodes")
         for node in osm_data.nodes:
             node.attributes['id'] = str(node.id)
             node.attributes['lon'] = node.lon
@@ -89,7 +89,7 @@ class MapLayer:
                                                 attributes=node.attributes,
                                                 tags=node.tags))
 
-        print("Reading ways")
+        print(f"Reading {len(osm_data.ways)} ways")
         for way in osm_data.ways:
             way.attributes['id'] = str(way.id)
             Stop(map_layer=self, primitive=Way(map_layer=self,
@@ -97,7 +97,7 @@ class MapLayer:
                                                tags=way.tags,
                                                nodes=way.nodes))
 
-        print("Reading relations")
+        print(f"Reading {len(osm_data.relations)} relations")
         for rel in osm_data.relations:
             members = []
             for member in rel.members:

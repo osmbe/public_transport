@@ -4,7 +4,7 @@ import os
 import re
 import shutil
 from difflib import SequenceMatcher
-from typing import Dict
+from typing import List, Dict, Pattern
 from urllib.parse import urlencode
 
 from pandas import DataFrame, read_excel
@@ -14,13 +14,27 @@ from scripts.OSM_data_model import Stop, Itinerary, Line, Primitive, Node, Relat
 
 
 class Agency:
-    map_layer = ...  # type: MapLayer
     agency_data = {}  # type: Dict[str, DataFrame]
     sheet_filename = 'temp.xlsx'
 
-    def __init__(self, name, operator_specific_tags=None, shorten_stop_name_regex=None,
-                 url_for_stops="", url_for_lines="", url_for_itineraries="",
-                 networks="", wikidata=None):
+    def __init__(self, name, sheet_url="", operator_specific_tags=None,
+                 shorten_stop_name_regex=None, url_for_stops="",
+                 url_for_lines="", url_for_itineraries="",
+                 networks=None, wikidata=None):
+        """
+
+        :param str            sheet_url:               url of Google sheet containing operator data
+        :param Dict[str, str] operator_specific_tags:  translation for ref, route_ref and zone
+        :param Pattern[str]   shorten_stop_name_regex: RE to create shorter versions of stop names
+                                                       for use in route relation names
+        :param str            url_for_stops:           format for url tag
+        :param str            url_for_lines:           format for url tag
+        :param str            url_for_itineraries:     format for url tag
+        :param Dict[int, str] networks:                lookup dict for network tags
+        :param Dict[str, str] wikidata:                lookup dict for Wikidata Q-items
+        """
+        self.name = name
+        self.sheet_url = sheet_url
         if operator_specific_tags is None:
             self.operator_specific_tags = {'ref': 'ref',
                                            'route_ref': 'route_ref',
@@ -33,18 +47,19 @@ class Agency:
             self.shorten_stop_nameRE = re.compile(r"""(?xiu)
                                                       (?P<name>[\s*\S]+?)
                                                       (?P<platform>\s*-?\s*platform\s*\d(\sand\s\d)*)?
-                                                      $
-					                     """)
+                                                      $""")
         self.url_for_stops = url_for_stops
         self.url_for_lines = url_for_lines
         self.url_for_itineraries = url_for_itineraries
-        self.networks = networks
+        if networks:
+            self.networks = networks
+        else:
+            self.networks = {}
         if wikidata:
             self.wikidata = wikidata
         else:
             self.wikidata = {}
 
-        self.name = name
         # dictionaries indexed on identifiers used at the operator/agency
         self.lines = {}
         self.itineraries = {}  # {'3303': [PublicTransportRoute, PublicTransportRoute, PublicTransportRoute]}
@@ -52,7 +67,11 @@ class Agency:
 
         self.map_layer = MapLayer()
 
-    def process_query_result(self, osm_data):
+    def process_query_result(self, osm_data,
+                             public_identifier='',
+                             agency_identifier=''):
+        if not (osm_data.nodes or osm_data.ways or osm_data.relations):
+            self.create_new_line(public_identifier, agency_identifier)
         self.map_layer.from_overpy(osm_data)
         self.populate_from_osm_data()
 
@@ -95,13 +114,13 @@ class Agency:
             if self.operator_specific_tags['ref'] in line.route_master.tags:
                 self.lines[line.route_master.tags[self.operator_specific_tags['ref']]] = line
 
-    def fetch_agency_data(self, sheet_url):
+    def fetch_agency_data(self):
         """Downloads a Google Sheet and saves it locally"""
         print("Download agency data from Google sheet")
         try:
             # TODO check for internet connection before downloading
             with open(self.sheet_filename, 'wb') as out_file:
-                shutil.copyfileobj(requests.get(sheet_url, stream=True).raw, out_file)
+                shutil.copyfileobj(requests.get(self.sheet_url, stream=True).raw, out_file)
         except:
             return None
 
@@ -132,7 +151,7 @@ class Agency:
                     self.operator_specific_tags['ref']: line_data_from_operator['routeidentifier'],
                     'operator': self.name,
                     'operator:wikidata': self.wikidata[self.name],
-                    #'url': ''
+                    # 'url': ''
                     }
             tags['network'] = 'DL' + self.networks[line_data_from_operator['routeidentifier'][0]],
             tags['network:wikidata'] = self.wikidata[tags['network']]
@@ -180,7 +199,7 @@ class Agency:
             if 'to' in tags:
                 tags['name'] += ' - ' + re.search(self.shorten_stop_nameRE, tags['to']).group('name')
         else:
-            print('no route master for:', line_identifier)
+            print('no route master yet for:', line_identifier)
             line = self.create_line(line_identifier)
         if not math.isnan(line_data_from_operator['type']):
             tags['bus'] = str(line_data_from_operator['type'])
@@ -214,17 +233,21 @@ class Agency:
                     if rm.primitive:
                         rm.primitive.tags['created_by'] = "This stop doesn't seem to exist anymore"
                 continue
-            """
-            # Compare name tag
-            if self.stops[stop].tags['name'] != operator_stop.stopdescription:
-                # print('stop name not equal')
-                self.stops[stop].tags['name'] = operator_stop.stopdescription
+            for stop_member in self.stops[stop].get_stop_primitives:
+                print(stop_member.primitive)
+                if stop_member.primitive is None:
+                    continue
+                print(stop_member.primitive)
+                # Compare name tag
+                if 'name' in stop_member.primitive.tags:
+                    if stop_member.primitive.tags['name'] != operator_stop.stopname:
+                        stop_member.primitive.add_tag('name', operator_stop.stopname)
 
-            # Compare route_ref tag
-            if self.stops[stop].tags[self.route_operator_specific_tags['ref']] != operator_stop.route_ref_calculated:
-                # print('route_ref not equal')
-                self.stops[stop].tags[self.route_operator_specific_tags['ref']] = operator_stop.route_ref_calculated
-            """
+                # Compare route_ref tag
+                route_ref_tag = self.operator_specific_tags['route_ref']
+                if route_ref_tag in stop_member.primitive.tags:
+                    if stop_member.primitive.tags[route_ref_tag] != operator_stop.route_ref_calculated:
+                        stop_member.primitive.add_tag(route_ref_tag, operator_stop.route_ref_calculated)
 
     def compare_itineraries(self):
         print("Compare itineraries (route relations)")
@@ -246,13 +269,17 @@ class Agency:
             self.create_new_itineraries_for_remaining_stop_signatures(itineraries_signatures, line_id)
 
     def create_new_itineraries_for_remaining_stop_signatures(self, itineraries_signatures, line_identifier):
+        """
+
+        :param Dict[str, bool] itineraries_signatures: {'a,b,c': True, 'b,c,d': False}
+        :param str line_identifier:
+        """
         print('remaining:', len(itineraries_signatures))
-        for itsig in itineraries_signatures:
+        for itinerary_signature in itineraries_signatures:
             # For all the remaining ones new route relations need to be created
-            print(itsig, itineraries_signatures[itsig])
             stop_members = []
-            if itineraries_signatures[itsig]:
-                for stop_ref in itsig.split(','):
+            if itineraries_signatures[itinerary_signature]:
+                for stop_ref in itinerary_signature.split(','):
                     if stop_ref in self.stops:
                         stop = self.stops[stop_ref]
                         stop_members.extend(stop.get_stop_primitives)
@@ -283,18 +310,29 @@ class Agency:
                 self.match_itineraries(itinerary, itineraries_signatures, route_signatures, rtsig)
         return itineraries_signatures
 
-    def discard_shorter_variants_of_telescopic_itineraries(self, signatures):
+    @staticmethod
+    def discard_shorter_variants_of_telescopic_itineraries(signatures):
+        """
+
+        :param Dict[str, bool] signatures: keys are comma delimited strings of stop identifiers
+        :return Dict[str, bool]: dict with only the longest unique sequences
+        """
+        print("signatures:", signatures)
         itineraries_signatures = {}
         for signature in signatures:
-            for key in list(itineraries_signatures.keys()):
-                if signature[0] in key:
-                elif key in signature[0]:
-                    del itineraries_signatures[key]
+            for each_signature in list(itineraries_signatures.keys()):
+                if each_signature in signature[0]:
+                    del itineraries_signatures[each_signature]
                     itineraries_signatures[signature[0]] = True
         return itineraries_signatures
 
     def create_stops_list(self, itinerary):
-        stopslist = []
+        """
+        Create a list of identifiers as used at the agency for this itinerary
+        :param Itinerary itinerary:
+        :return List[str]:
+        """
+        stops_list = []
         for stop in itinerary.stops:
             for stop_member in stop.get_stop_primitives:
                 if stop_member.id in self.map_layer.primitives['nodes']:
@@ -304,15 +342,13 @@ class Agency:
                     # The Overpass query should have downloaded all child objects
                     print(stop_member.id, ' was not found in downloaded data')
                     continue
-                stopslist.append(nd.tags[self.operator_specific_tags['ref']])
-        return stopslist
+                stops_list.append(nd.tags[self.operator_specific_tags['ref']])
+        return stops_list
 
     def match_itineraries(self, itin, itineraries_signatures, route_signatures, rtsig):
         highest_score = 0.0
         best_match = ''
-        # print(rtsig)
         for itsig in itineraries_signatures:
-            # print(itsig)
             if route_signatures[rtsig]:
                 cur = SequenceMatcher(None, route_signatures[rtsig], itsig).ratio()
                 if cur > highest_score:
@@ -327,7 +363,7 @@ class Agency:
                         else:
                             try:
                                 stop_data = self.agency_data['stops'].loc[str(stop)]
-                            except:
+                            except KeyError:
                                 continue
                             try:
                                 stop_ref = stop_data.stopidentfier
@@ -336,11 +372,12 @@ class Agency:
                                 continue
                             stops_list.append(Stop(map_layer=self.map_layer,
                                                    primitive=Node(map_layer=self.map_layer,
-                                                                  tags={'name': stop_data.stopdescription,
-                                                                        self.operator_specific_tags[
-                                                                            'ref']: stop_ref,
-                                                                        'operator': 'De Lijn',
-                                                                        'url': 'mijnlijn.be/' + stop_data.stopidentfier,
+                                                                  tags={'name': stop_data.stopname,
+                                                                        self.operator_specific_tags['ref']: stop_ref,
+                                                                        'operator': self.name,
+                                                                        'network': f'DL{self.networks[stop_ref[0]]}',
+                                                                        'url': self.url_for_stops.replace(
+                                                                            '{stopidentifier}', stop_ref),
                                                                         }
                                                                   )
                                                    )
@@ -354,8 +391,8 @@ class Agency:
         for line in self.lines:
             for route_member in self.lines[line].route_master.members:
                 if route_member.id in self.map_layer.primitives['relations']:
-                    if not (self.operator_specific_tags['ref'] in self.map_layer.primitives['relations'][
-                        route_member.id].tags):
+                    if not (self.operator_specific_tags['ref'] in
+                            self.map_layer.primitives['relations'][route_member.id].tags):
                         self.map_layer.primitives['relations'][route_member.id].add_tag(
                             self.operator_specific_tags['ref'], line)
             try:
@@ -371,9 +408,18 @@ class Agency:
                 print('line name equal')
 
     def write_xml_to_file(self, filename):
+        """
+
+        :param str filename:
+        """
         self.map_layer.xml().write(filename)
 
     def send_to_josm(self, new_layer=True, layer_name='Data from operator'):
+        """
+
+        :param bool new_layer:
+        :param str  layer_name:
+        """
         remote_control_base_url = "http://127.0.0.1:8111/"
         filename = layer_name + '.osm'
         params = {'layer_name': layer_name}
@@ -398,7 +444,7 @@ class Agency:
     def check_if_josm_is_running(self, remote_control_base_url):
         """
 
-        :type remote_control_base_url: str
+        :param str remote_control_base_url: JOSM RC localhost including port
         """
         try:
             response = requests.get("{0}version".format(remote_control_base_url))
@@ -412,13 +458,24 @@ class Agency:
 
     def tell_josm_to_import_data_via_remote_control(self, filename, params, remote_control_base_url):
         response = None
+        remote_control_import_url = (f"{remote_control_base_url}"
+                                     f"import?{urlencode(params)}"
+                                     f"&url=file://{os.getcwd()}/{filename.replace(' ', '%20')}")
         try:
-            remote_control_import_url = remote_control_base_url + "import?" + urlencode(
-                params) + "&url=" + "file://" + os.getcwd() + '/' + filename.replace(
-                ' ', '%20')
             response = requests.get(remote_control_import_url)
             print(response)
-        except:
+        except requests.exceptions.RequestException as e:
+            print(e)
             print('sending to', remote_control_import_url, 'failed')
 
         return response
+
+    def create_new_line(self, public_identifier, agency_identifier):
+        if not agency_identifier:
+            agency_identifier = self.ask_user(public_identifier)
+
+    def ask_user(self, public_identifier):
+        # TODO ask user looking up all possibilities using public_identifier
+        agency_identifier = ''
+
+        return agency_identifier

@@ -17,10 +17,17 @@ download_again = True
 # (._;>>;);
 # out meta;'''
 
-query = '''
+public_identifier = '598'
+public_identifier = '305'
+agency_identifier = ''
+if public_identifier:
+    public_identifier = f'["ref"="{public_identifier}"]'
+if agency_identifier:
+    agency_identifier = f'["ref:De_Lijn"="{agency_identifier}"]'
+query = f'''
 [out:xml][timeout:290];
 (
-  relation["operator"="De Lijn"]["ref"="305"];
+  relation["operator"="De Lijn"]{public_identifier}{agency_identifier};
 );
 
 (._;>>;);
@@ -32,23 +39,25 @@ specific_tags = {}
 for t in ['ref', 'route_ref', 'zone']:
     specific_tags[t] = t + ':De_Lijn'
 
-wikidata = {'De Lijn': '',
-            'DlAn': '',
-            'DlOV': '',
-            'DlVB': '',
-            'DlLi': '',
-            'DlWV': '',
+wikidata = {'De Lijn': 'Q614819',
+            'DlAn': 'Q34803327',
+            'DlOV': 'Q34803340',
+            'DlVB': 'Q34803298',
+            'DlLi': 'Q34803313',
+            'DlWV': 'Q34803353',
             }
 delijn = Agency(name='De Lijn',
+                sheet_url=("https://docs.google.com/spreadsheet/ccc"
+                           "?key=1PGgEqobO90Mf9NsJHO1-JD-Npte1fYztK30HO5lRDI8"
+                           "&output=xls"),
                 operator_specific_tags=specific_tags,
                 shorten_stop_name_regex=re.compile(r"""(?xiu)
-                                                      (?P<name>[\s*\S]+?)
-                                                      (?P<platform>\s*-?\s*perron\s*\d+(\sen\s\d+)*)?
-                                                      $
-					                     """),
+                                                       (?P<name>[\s*\S]+?)
+                                                       (?P<platform>\s*-?\s*perron\s*\d+(\sen\s\d+)*)?
+                                                       $"""),
                 url_for_stops="mijnlijn.be/{stopidentifier}",
-                url_for_lines="https://www.delijn.be/nl/lijnen/lijn/{routeidentifier}[0]/{routeidentifier}[1:]",
-                url_for_itineraries="https://www.delijn.be/nl/lijnen/lijn/{routeidentifier}[0]/{routeidentifier}[1:]",
+                url_for_lines="https://www.delijn.be/nl/lijnen/lijn/{routeidentifier[0]}/{routeidentifier[1:]}",
+                url_for_itineraries="https://www.delijn.be/nl/lijnen/lijn/{routeidentifier[0]}/{routeidentifier[1:]}",
                 networks={1: 'An',
                           2: 'OV',
                           3: 'VB',
@@ -75,10 +84,9 @@ else:
     print("downloading data directly from Overpass API")
     osm_data = api.query(query)
 
-delijn.process_query_result(osm_data)
+delijn.process_query_result(osm_data, public_identifier=public_identifier, agency_identifier=agency_identifier)
 
-delijn.fetch_agency_data(
-    sheet_url="https://docs.google.com/spreadsheet/ccc?key=1PGgEqobO90Mf9NsJHO1-JD-Npte1fYztK30HO5lRDI8&output=xls")
+delijn.fetch_agency_data()
 delijn.load_agency_data()
 delijn.update_using_operator_data()
 delijn.send_to_josm()
